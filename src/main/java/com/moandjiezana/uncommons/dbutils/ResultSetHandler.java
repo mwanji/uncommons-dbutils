@@ -19,37 +19,39 @@ package com.moandjiezana.uncommons.dbutils;
 import static com.moandjiezana.uncommons.dbutils.MapResultSetHandler.column;
 
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Implementations of this interface convert {@link ResultSet}s into other objects.
+ * Converts {@link ResultSet}s to other objects.
  *
  * @param <T>
- *          the target type the input {@link ResultSet} will be converted to.
+ *    the target type the input {@link ResultSet} will be converted to.
  */
+@FunctionalInterface
 public interface ResultSetHandler<T> {
 
   /**
-   * Turn the {@link ResultSet} into an Object.
+   * Turn the {@link ResultSet} into an instance of T.
    *
    * @param rs
-   *          The {@link ResultSet} to handle. It has not been touched
-   *          before being passed to this method.
+   *    The {@link ResultSet} to handle. It has not been touched before being passed to this method.
+   *    
+   * @return An Object initialized with {@link ResultSet} data. Implementations may return <code>null</code>.
    *
-   * @return An Object initialized with {@link ResultSet} data. Implementations may return <code>null</code> if the
-   *         {@link ResultSet} contained 0 rows.
-   *
-   * @throws SQLException
-   *           if a database access error occurs
+   * @throws Exception
+   *    if a database access error occurs
    */
   T handle(ResultSet rs) throws Exception;
 
   /**
-   * Processes the first row of the {@link ResultSet}. If it is empty, returns null.
+   * @param rowProcessor
+   *    creates an instance of T
+   * @param <T>
+   *    the instance type
+   * @return an instance of T from the first row of the {@link ResultSet} or null, if the {@link ResultSet} is empty
    */
   static <T> ResultSetHandler<T> single(RowProcessor<T> rowProcessor) {
     return rs -> {
@@ -62,7 +64,11 @@ public interface ResultSetHandler<T> {
   }
   
   /**
-   * Processes the first row of the {@link ResultSet}, wrapped in an {@link Optional}. If the {@link ResultSet} is empty, returns an empty {@link Optional}.
+   * @param rowProcessor
+   *    creates an instance of T
+   * @param <T>
+   *    the type of the instance wrapped in an {@link Optional}
+   * @return an instance of T from the first row of the {@link ResultSet}, wrapped in an {@link Optional} or an empty {@link Optional} if the {@link ResultSet} is empty.
    */
   static <T> ResultSetHandler<Optional<T>> maybe(RowProcessor<T> rowProcessor) {
     return rs -> {
@@ -75,7 +81,12 @@ public interface ResultSetHandler<T> {
   }
 
   /**
-   * Processes each row in the {@link ResultSet}. If it is empty, returns an empty {@link List}.
+   * 
+   * @param rowProcessor
+   *    creates an instance of T
+   * @param <T>
+   *    the instance type
+   * @return a {@link List} of T or an empty {@link List} if the {@link ResultSet} is empty.
    */
   static <T> ResultSetHandler<List<T>> list(RowProcessor<T> rowProcessor) {
     return rs -> {
@@ -89,13 +100,27 @@ public interface ResultSetHandler<T> {
   }
   
   /**
-   * Converts a {@link ResultSet} to a {@link Map} of keys taken from keyColumn and values returned by rowProcessor.
+   * @param keyColumn
+   *    the name of the column the map key can be extracted from
+   * @param keyClass
+   *    the type of the {@link Map} keys
+   * @param rowProcessor
+   *    creates an instance of V
+   * @param <K>
+   *    the type of the {@link Map} keys
+   * @param <V>
+   *    the type of the {@link Map} values
    * 
-   * For more customisation, see {@link MapResultSetHandler}.
+   * @return a {@link Map} with keys taken from keyColumn or an empty {@link Map} if the {@link ResultSet} is empty.
+   * 
+   * @see MapResultSetHandler
    */
-  static <K, T> ResultSetHandler<Map<K, T>> map(String keyColumn, Class<K> keyClass, RowProcessor<T> rowProcessor) {
+  static <K, V> ResultSetHandler<Map<K, V>> map(String keyColumn, Class<K> keyClass, RowProcessor<V> rowProcessor) {
     return new MapResultSetHandler<>(column("id", keyClass), rowProcessor);
   }
 
+  /**
+   * Returns nothing.
+   */
   static ResultSetHandler<Void> VOID = rs -> { return null; };
 }
