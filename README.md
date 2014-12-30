@@ -56,4 +56,10 @@ try (Connection connection = // obtain connection) {
 }
 ```
 
+## License
+
+[Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
+## Further Reading
+
 Find out more at https://mwanji.github.io/uncommons-dbutils
