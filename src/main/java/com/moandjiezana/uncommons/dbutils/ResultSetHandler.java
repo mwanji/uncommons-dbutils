@@ -64,19 +64,15 @@ public interface ResultSetHandler<T> {
   }
   
   /**
-   * @param rowProcessor
-   *    creates an instance of T
+   * @param resultSetHandler
+   *    processes the {@link ResultSet}
    * @param <T>
    *    the type of the instance wrapped in an {@link Optional}
-   * @return an instance of T from the first row of the {@link ResultSet}, wrapped in an {@link Optional} or an empty {@link Optional} if the {@link ResultSet} is empty.
+   * @return the result of invoking the underlying {@link ResultSetHandler}, wrapped in an {@link Optional}.
    */
-  static <T> ResultSetHandler<Optional<T>> maybe(RowProcessor<T> rowProcessor) {
+  static <T> ResultSetHandler<Optional<T>> optional(ResultSetHandler<T> resultSetHandler) {
     return rs -> {
-      if (!rs.next()) {
-        return Optional.empty();
-      }
-      
-      return Optional.ofNullable(rowProcessor.handle(rs));
+      return Optional.ofNullable(resultSetHandler.handle(rs));
     };
   }
 
