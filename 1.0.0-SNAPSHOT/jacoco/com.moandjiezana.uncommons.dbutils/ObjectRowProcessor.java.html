@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ObjectRowProcessor.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">uncommons-dbutils</a> &gt; <a href="index.source.html" class="el_package">com.moandjiezana.uncommons.dbutils</a> &gt; <span class="el_source">ObjectRowProcessor.java</span></div><h1>ObjectRowProcessor.java</h1><pre class="source lang-java linenums">package com.moandjiezana.uncommons.dbutils;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.sql.ResultSet;
+import java.util.function.Predicate;
+
+import com.moandjiezana.uncommons.dbutils.functions.BiFunctionWithException;
+
+public class ObjectRowProcessor&lt;T&gt; implements RowProcessor&lt;T&gt; {
+  
+  public static Predicate&lt;String&gt; table(String tableName) {
+<span class="nc" id="L13">    return t -&gt; t.equalsIgnoreCase(tableName);</span>
+  }
+  
+  public static final &lt;U&gt; BiFunctionWithException&lt;Class&lt;U&gt;, String, Field&gt; matching() {
+<span class="fc" id="L17">    return (cl, col) -&gt; cl.getDeclaredField(col);</span>
+  }
+  
+  public static final &lt;U&gt; BiFunctionWithException&lt;Class&lt;U&gt;, String, Field&gt; underscoresToCamel() {
+<span class="fc" id="L21">    return (cl, col) -&gt; {</span>
+<span class="fc" id="L22">      StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">      for (int i = 0; i &lt; col.length(); i++) {</span>
+<span class="fc" id="L24">        char ch = col.charAt(i);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (ch == '_') {</span>
+<span class="fc" id="L26">          i++;</span>
+<span class="fc" id="L27">          sb.append(Character.toUpperCase(col.charAt(i)));</span>
+        } else {
+<span class="fc" id="L29">          sb.append(Character.toLowerCase(ch));</span>
+        }
+      }
+      
+<span class="fc" id="L33">      return cl.getDeclaredField(sb.toString());</span>
+    };
+  }
+  
+  private final Class&lt;T&gt; objectClass;
+  private final BiFunctionWithException&lt;Class&lt;T&gt;, String, Field&gt; columnToFieldMapper;
+<span class="fc" id="L39">  private final Converters converters = Converters.INSTANCE;</span>
+  private final Predicate&lt;String&gt; tablePredicate;
+  
+  public ObjectRowProcessor(Class&lt;T&gt; objectClass, BiFunctionWithException&lt;Class&lt;T&gt;, String, Field&gt; columnToFieldMapper) {
+<span class="fc" id="L43">    this(objectClass, t -&gt; true, columnToFieldMapper);</span>
+<span class="fc" id="L44">  }</span>
+
+<span class="fc" id="L46">  public ObjectRowProcessor(Class&lt;T&gt; objectClass, Predicate&lt;String&gt; tablePredicate, BiFunctionWithException&lt;Class&lt;T&gt;, String, Field&gt; columnToFieldMapper) {</span>
+<span class="fc" id="L47">    this.objectClass = objectClass;</span>
+<span class="fc" id="L48">    this.tablePredicate = tablePredicate;</span>
+<span class="fc" id="L49">    this.columnToFieldMapper = columnToFieldMapper;</span>
+<span class="fc" id="L50">  }</span>
+
+  @Override
+  public T handle(ResultSet rs) throws Exception {
+<span class="fc" id="L54">    Constructor&lt;T&gt; constructor = objectClass.getDeclaredConstructor();</span>
+<span class="fc" id="L55">    constructor.setAccessible(true);</span>
+<span class="fc" id="L56">    T instance = constructor.newInstance();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">      for (int i = 1; i &lt;= rs.getMetaData().getColumnCount(); i++) {</span>
+<span class="fc" id="L58">        String jdbcTableName = rs.getMetaData().getTableName(i).toLowerCase();</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (tablePredicate.test(jdbcTableName)) {</span>
+<span class="fc" id="L60">          String columnLabel = rs.getMetaData().getColumnLabel(i).toLowerCase();</span>
+<span class="fc" id="L61">          Field field = columnToFieldMapper.apply(objectClass, columnLabel);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">          if (field == null) {</span>
+<span class="fc" id="L63">            continue;</span>
+          }
+<span class="fc" id="L65">          field.setAccessible(true);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">          if (field.getType() == boolean.class) {</span>
+<span class="fc" id="L67">            field.set(instance, rs.getBoolean(i));</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">          } else if (field.getType() == int.class) {</span>
+<span class="fc" id="L69">            field.set(instance, rs.getInt(i));</span>
+          } else {
+<span class="fc" id="L71">            field.set(instance, converters.convert(field.getType(), rs.getObject(i)));</span>
+          }
+        }
+        
+    };
+    
+<span class="fc" id="L77">    return instance;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.2.201409121644</span></div></body></html>

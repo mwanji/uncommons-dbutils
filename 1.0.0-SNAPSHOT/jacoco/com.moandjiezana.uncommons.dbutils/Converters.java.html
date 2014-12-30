@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Converters.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">uncommons-dbutils</a> &gt; <a href="index.source.html" class="el_package">com.moandjiezana.uncommons.dbutils</a> &gt; <span class="el_source">Converters.java</span></div><h1>Converters.java</h1><pre class="source lang-java linenums">package com.moandjiezana.uncommons.dbutils;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.sql.ResultSet;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Groups {@link Converter}s together.
+ * 
+ * {@link Converters#INSTANCE} is a singleton that provides defaults and makes registered {@link Converter}s available globally
+ *
+ */
+public interface Converters {
+  
+  /**
+   * @param targetClass
+   *    the class to convert value to
+   * @param value
+   *    the object to be converted
+   * @param &lt;T&gt;
+   *    the type of the converted value
+   * @return an instance of T
+   */
+  &lt;T&gt; T convert(Class&lt;T&gt; targetClass, Object value);
+  
+  /**
+   * @param targetClass
+   *    the type handled by this {@link Converter}
+   * @param converter
+   *    the {@link Converter}
+   * @param &lt;T&gt;
+   *    the type of the converted value
+   */
+  &lt;T&gt; void register(Class&lt;T&gt; targetClass, Converter&lt;T&gt; converter);
+  
+  /**
+   * A singleton that provides defaults and makes registered {@link Converter}s available globally.
+   * 
+   * Supports all types returned by {@link ResultSet}#getXxx() methods, {@link Instant} and any class with a static &lt;code&gt;valueOf(String)&lt;/code&gt; method.
+   * 
+   * If no conversion can be performed, returns &lt;code&gt;null&lt;/code&gt;.
+   */
+<span class="fc" id="L50">  static final Converters INSTANCE = new Converters() {</span>
+<span class="fc" id="L51">    private final Map&lt;Class&lt;?&gt;, Converter&lt;?&gt;&gt; converters = new HashMap&lt;&gt;();</span>
+    
+    {
+<span class="fc" id="L54">      register(Instant.class, (cl, value) -&gt; ((Timestamp) value).toInstant());</span>
+<span class="fc" id="L55">    }</span>
+
+    @Override
+    public &lt;T&gt; T convert(Class&lt;T&gt; targetClass, Object value) {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">      if (value == null) {</span>
+<span class="fc" id="L60">        return null;</span>
+      }
+      
+<span class="fc bfc" id="L63" title="All 2 branches covered.">      if (targetClass.isAssignableFrom(value.getClass())) {</span>
+<span class="fc" id="L64">        return targetClass.cast(value);</span>
+      }
+      
+<span class="fc" id="L67">      Optional&lt;Method&gt; valueOfMethod = Arrays.stream(targetClass.getMethods())</span>
+<span class="fc" id="L68">        .filter(m -&gt; Modifier.isStatic(m.getModifiers()))</span>
+<span class="fc" id="L69">        .filter(m -&gt; m.getName().equals(&quot;valueOf&quot;))</span>
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">        .filter(m -&gt; m.getParameterCount() == 1 &amp;&amp; m.getParameterTypes()[0] == value.getClass())</span>
+<span class="fc" id="L71">        .findFirst();</span>
+      
+<span class="fc bfc" id="L73" title="All 2 branches covered.">      if (valueOfMethod.isPresent()) {</span>
+        try {
+<span class="fc" id="L75">          return targetClass.cast(valueOfMethod.get().invoke(null, value));</span>
+<span class="nc" id="L76">        } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L77">          throw new RuntimeException(e);</span>
+        }
+      }
+      
+<span class="fc bfc" id="L81" title="All 2 branches covered.">      if (!converters.containsKey(targetClass)) {</span>
+<span class="fc" id="L82">        throw new IllegalArgumentException(&quot;Cannot convert to &quot; + targetClass.getName());</span>
+      }
+      
+      @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L86">      Converter&lt;T&gt; converter = (Converter&lt;T&gt;) converters.get(targetClass);</span>
+<span class="fc" id="L87">      return converter.convert(targetClass, value);</span>
+    }
+    
+    @Override
+    public &lt;T&gt; void register(Class&lt;T&gt; targetClass, Converter&lt;T&gt; converter) {
+<span class="fc" id="L92">      converters.put(targetClass, converter);</span>
+<span class="fc" id="L93">    }</span>
+  };
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.2.201409121644</span></div></body></html>

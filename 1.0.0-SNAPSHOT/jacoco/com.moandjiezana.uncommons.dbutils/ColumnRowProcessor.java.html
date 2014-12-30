@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ColumnRowProcessor.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">uncommons-dbutils</a> &gt; <a href="index.source.html" class="el_package">com.moandjiezana.uncommons.dbutils</a> &gt; <span class="el_source">ColumnRowProcessor.java</span></div><h1>ColumnRowProcessor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.moandjiezana.uncommons.dbutils;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+/**
+ * Converts the specified {@link ResultSet} column into an instance of T. This class is thread safe.
+ * 
+ * @param &lt;T&gt;
+ *    The type of the column. When no class is specified via the constructor, this must match or be a super-type of what is returned by the {@link ResultSet}.
+ */
+public class ColumnRowProcessor&lt;T&gt; implements RowProcessor&lt;T&gt; {
+  
+  private final int columnIndex;
+  private final String columnName;
+  private final Class&lt;T&gt; objectClass;
+
+  /**
+   * 
+   * @param columnIndex
+   *    The index of the column to retrieve from the {@link ResultSet}.
+   */
+  public ColumnRowProcessor(int columnIndex) {
+<span class="fc" id="L40">    this(columnIndex, null);</span>
+<span class="fc" id="L41">  }</span>
+
+  /**
+   * @param columnIndex
+   *    The index of the column to retrieve from the {@link ResultSet}.
+   * @param objectClass
+   *    The class of the returned instance. Makes custom conversion possible.
+   */
+  public ColumnRowProcessor(int columnIndex, Class&lt;T&gt; objectClass) {
+<span class="fc" id="L50">    this(columnIndex, null, objectClass);</span>
+<span class="fc" id="L51">  }</span>
+  
+  /**
+   * @param columnName
+   *    The name of the column to retrieve from the {@link ResultSet}.
+   */
+  public ColumnRowProcessor(String columnName) {
+<span class="nc" id="L58">    this(columnName, null);</span>
+<span class="nc" id="L59">  }</span>
+
+  /**
+   * @param columnName
+   *    The name of the column to retrieve from the {@link ResultSet}.
+   * @param objectClass
+   *    The class of the returned instance. Makes custom conversion possible.
+   */
+  public ColumnRowProcessor(String columnName, Class&lt;T&gt; objectClass) {
+<span class="nc" id="L68">    this(0, columnName, objectClass);</span>
+<span class="nc" id="L69">  }</span>
+
+  /**
+   * @param rs
+   *    {@link ResultSet} to process.
+   * @return an instance of T, either by conversion if a class was specified or by casting.
+   * @throws SQLException
+   *    if a database access error occurs
+   * @throws ClassCastException
+   *    if no class was specified and T does not match the column type
+   */
+  @SuppressWarnings(&quot;unchecked&quot;)
+  @Override
+  public T handle(ResultSet rs) throws SQLException {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">    Object raw = this.columnIndex == 0 ? rs.getObject(columnName) : rs.getObject(columnIndex);</span>
+    
+<span class="fc bfc" id="L85" title="All 2 branches covered.">    if (objectClass == null) {</span>
+<span class="fc" id="L86">      return (T) raw;</span>
+    }
+    
+<span class="fc" id="L89">    return Converters.INSTANCE.convert(objectClass, raw);</span>
+  }
+
+<span class="fc" id="L92">  private ColumnRowProcessor(int columnIndex, String columnName, Class&lt;T&gt; objectClass) {</span>
+<span class="fc" id="L93">    this.columnIndex = columnIndex;</span>
+<span class="fc" id="L94">    this.columnName = columnName;</span>
+<span class="fc" id="L95">    this.objectClass = objectClass;</span>
+<span class="fc" id="L96">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.2.201409121644</span></div></body></html>

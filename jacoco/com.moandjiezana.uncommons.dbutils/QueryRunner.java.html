@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>QueryRunner.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">uncommons-dbutils</a> &gt; <a href="index.source.html" class="el_package">com.moandjiezana.uncommons.dbutils</a> &gt; <span class="el_source">QueryRunner.java</span></div><h1>QueryRunner.java</h1><pre class="source lang-java linenums">/*
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.moandjiezana.uncommons.dbutils;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
+import java.util.Arrays;
+import java.util.List;
+
+import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
+import com.moandjiezana.uncommons.dbutils.functions.ConsumerWithException;
+import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
+import com.moandjiezana.uncommons.dbutils.functions.SupplierWithException;
+
+/**
+ * Executes SQL queries with pluggable strategies for handling {@link ResultSet}s.
+ * Immutable, but only as threadsafe as the underlying {@link Connection}. Avoid sharing {@link Connection} instances across threads!
+ * 
+ * @see ResultSetHandler
+ */
+public class QueryRunner {
+  
+  public static class Transaction {
+    public void commit() throws SQLException {
+<span class="fc" id="L40">      connection.commit();</span>
+<span class="fc" id="L41">    }</span>
+    
+    public void rollback() throws SQLException {
+<span class="fc" id="L44">      connection.rollback();</span>
+<span class="fc" id="L45">    }</span>
+    
+    private final Connection connection;
+
+<span class="fc" id="L49">    private Transaction(Connection connection) {</span>
+<span class="fc" id="L50">      this.connection = connection;</span>
+<span class="fc" id="L51">    }</span>
+  }
+
+  private final SupplierWithException&lt;Connection&gt; connection;
+  private final ConsumerWithException&lt;Connection&gt; finalizer;
+
+  /**
+   * &lt;pre&gt;&lt;code&gt;
+   * try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+   *   QueryRunner queryRunner = QueryRunner.create(connection);
+   * }
+   * &lt;/code&gt;&lt;/pre&gt;
+   * 
+   * @param connection
+   *    the {@link Connection} to be used. Must be managed by the caller
+   * @return a {@link Connection}-based QueryRunner
+   */
+  public static QueryRunner create(Connection connection) {
+<span class="fc" id="L69">    return new QueryRunner(() -&gt; connection, c -&gt; {});</span>
+  }
+  
+  public QueryRunner initializeWith(ConsumerWithException&lt;Connection&gt; initializer) {
+<span class="fc" id="L73">    return new QueryRunner(connection.andThen(initializer), finalizer);</span>
+  }
+  
+  /**
+   * @param sql
+   *    the SELECT to execute
+   * @param resultSetHandler
+   *    transforms the {@link ResultSet}
+   * @param params
+   *    values for the SQL placeholders
+   * @param &lt;T&gt;
+   *    the type of instance to return
+   * @return an instance of T as determined by resultSetHandler
+   * @throws Exception
+   *    if anything goes wrong
+   */
+ public &lt;T&gt; T select(String sql, ResultSetHandler&lt;T&gt; resultSetHandler, Object... params) throws Exception {
+<span class="fc" id="L90">    return run(c -&gt; {</span>
+<span class="pc" id="L91">      try (PreparedStatement stmt = c.prepareStatement(sql);) {</span>
+<span class="fc" id="L92">        fillStatement(stmt, Arrays.asList(params));</span>
+        
+<span class="pc" id="L94">        try (ResultSet rs = stmt.executeQuery();) {</span>
+<span class="fc" id="L95">          return resultSetHandler.handle(rs);</span>
+<span class="pc bpc" id="L96" title="6 of 8 branches missed.">        }</span>
+<span class="pc bpc" id="L97" title="6 of 8 branches missed.">      }</span>
+    });
+  }
+
+  /**
+   * @param sql
+   *    the UPDATE, DELETE or DDL to execute. Ignores any values returned by the {@link ResultSet}.
+   * @param params
+   *    values for the SQL placeholders
+   *
+   * @return The number of rows updated.
+   * @throws Exception
+   *    if anything goes wrong
+   */
+  public int execute(String sql, Object... params) throws Exception {
+<span class="fc" id="L112">    return run(c -&gt; {</span>
+<span class="pc" id="L113">      try (PreparedStatement statement = connection.get().prepareStatement(sql);) {</span>
+<span class="fc" id="L114">        fillStatement(statement, Arrays.asList(params));</span>
+
+<span class="fc" id="L116">        return statement.executeUpdate();</span>
+<span class="pc bpc" id="L117" title="6 of 8 branches missed.">      }</span>
+    });
+  }
+  
+  /**
+   * @param sql
+   *    the INSERT to execute
+   * @param resultSetHandler
+   *    transforms the {@link ResultSet}, which contains the generated keys
+   * @param params
+   *    values for the SQL placeholders
+   * @param &lt;T&gt;
+   *    the type of instance to return
+   * @return an instance of T as determined by resultSetHandler
+   * @throws Exception
+   *    if anything goes wrong
+   */
+  public &lt;T&gt; T insert(String sql, ResultSetHandler&lt;T&gt; resultSetHandler, Object... params) throws Exception {
+<span class="fc" id="L135">    return run(c -&gt; {</span>
+<span class="pc" id="L136">    try (PreparedStatement stmt = connection.get().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {</span>
+<span class="fc" id="L137">      fillStatement(stmt, Arrays.asList(params));</span>
+<span class="fc" id="L138">      stmt.executeUpdate();</span>
+      
+<span class="pc" id="L140">      try (ResultSet resultSet = stmt.getGeneratedKeys();) {</span>
+<span class="fc" id="L141">        return resultSetHandler.handle(resultSet);</span>
+<span class="pc bpc" id="L142" title="6 of 8 branches missed.">      }</span>
+<span class="pc bpc" id="L143" title="6 of 8 branches missed.">    }</span>
+    });
+  }
+
+  /**
+   * @param sql
+   *    the SQL to execute
+   * @param params
+   *    values for the SQL placeholders. Eg. &lt;code&gt;Arrays.asList(Arrays.asList(1L), Arrays.asList(2L))&lt;/code&gt; will create a batch of 2 queries, using 1, then 2, as values.
+   * @return the number of affected rows for each time the SQL was executed
+   * @throws Exception
+   *    if anything goes wrong
+   */
+  public int[] batch(String sql, List&lt;List&lt;Object&gt;&gt; params) throws Exception {
+<span class="fc" id="L157">    return run(c -&gt; {</span>
+<span class="pc" id="L158">      try (PreparedStatement statement = connection.get().prepareStatement(sql);) {</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (int i = 0; i &lt; params.size(); i++) {</span>
+<span class="fc" id="L160">          this.fillStatement(statement, params.get(i));</span>
+<span class="fc" id="L161">          statement.addBatch();</span>
+        }
+
+<span class="fc" id="L164">        return statement.executeBatch();</span>
+<span class="pc bpc" id="L165" title="6 of 8 branches missed.">      }</span>
+    });
+  }
+
+  /**
+   * @param sql
+   *    The INSERT to execute
+   * @param resultSetHandler
+   *    transforms the {@link ResultSet}, which contains the generated keys
+   * @param batchParams
+   *    values for the SQL placeholders. Eg. &lt;code&gt;Arrays.asList(Arrays.asList(1L), Arrays.asList(2L))&lt;/code&gt; will create a batch of 2 queries, using 1, then 2, as values.
+   * @param &lt;T&gt;
+   *    the type of instance to return
+   * @return an instance of T as determined by resultSetHandler
+   * @throws Exception
+   *    if anything goes wrong
+   */
+  public &lt;T&gt; T batchInsert(String sql, ResultSetHandler&lt;T&gt; resultSetHandler, List&lt;List&lt;Object&gt;&gt; batchParams) throws Exception {
+<span class="fc" id="L183">    return run(c -&gt; {</span>
+<span class="pc" id="L184">      try (PreparedStatement stmt = connection.get().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (List&lt;Object&gt; params : batchParams) {</span>
+<span class="fc" id="L186">          this.fillStatement(stmt, params);</span>
+<span class="fc" id="L187">          stmt.addBatch();</span>
+<span class="fc" id="L188">        }</span>
+<span class="fc" id="L189">        stmt.executeBatch();</span>
+<span class="fc" id="L190">        ResultSet rs = stmt.getGeneratedKeys();</span>
+
+<span class="fc" id="L192">        return resultSetHandler.handle(rs);</span>
+<span class="pc bpc" id="L193" title="6 of 8 branches missed.">      }</span>
+    });
+  }
+  
+  /**
+   * &lt;p&gt;Provides a {@link QueryRunner} that can be used in a transaction.&lt;/p&gt;
+   * 
+   * &lt;p&gt;The underlying {@link Connection} is configured in the same way as any other {@link Connection} from this {@link QueryRunner}, except that
+   * {@link Connection#setAutoCommit(boolean)} is set to false before any calls are made and set to true afterwards.&lt;/p&gt;
+   * 
+   * &lt;p&gt;Make sure to call {@link Connection#commit()} or {@link Connection#rollback()}!&lt;/p&gt;
+   * 
+   * @param txQueryRunner
+   *    Make sure to use this {@link QueryRunner} in the transaction block
+   * @throws Exception
+   *    if anything goes wrong
+   */
+  public void tx(BiConsumerWithException&lt;QueryRunner, QueryRunner.Transaction&gt; txQueryRunner) throws Exception {
+<span class="fc" id="L211">    Connection _connection = connection.get();</span>
+<span class="fc" id="L212">    _connection.setAutoCommit(false);</span>
+<span class="fc" id="L213">    QueryRunner queryRunner = new QueryRunner(() -&gt; _connection, c -&gt; {});</span>
+    try {
+<span class="fc" id="L215">      txQueryRunner.accept(queryRunner, new QueryRunner.Transaction(_connection));</span>
+    } finally {
+<span class="pc" id="L217">      finalizer.accept(_connection);</span>
+<span class="pc" id="L218">      _connection.setAutoCommit(true);</span>
+<span class="fc" id="L219">    }</span>
+<span class="fc" id="L220">  }</span>
+
+<span class="fc" id="L222">  QueryRunner(SupplierWithException&lt;Connection&gt; connection, ConsumerWithException&lt;Connection&gt; finalizer) {</span>
+<span class="fc" id="L223">    this.connection = connection;</span>
+<span class="fc" id="L224">    this.finalizer = finalizer;</span>
+<span class="fc" id="L225">  }</span>
+
+  /*
+   * Fill the &lt;code&gt;PreparedStatement&lt;/code&gt; replacement parameters with the
+   * given objects.
+   * 
+   * @param stmt PreparedStatement to fill
+   * 
+   * @param params Query replacement parameters; &lt;code&gt;null&lt;/code&gt; is a valid
+   * value to pass in.
+   * 
+   * @throws SQLException if a database access error occurs
+   */
+  private void fillStatement(PreparedStatement statement, List&lt;Object&gt; params) throws SQLException {
+<span class="fc bfc" id="L239" title="All 2 branches covered.">    for (int i = 0; i &lt; params.size(); i++) {</span>
+<span class="fc" id="L240">      Object param = params.get(i);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">      if (param != null) {</span>
+<span class="fc" id="L242">        statement.setObject(i + 1, param);</span>
+      } else {
+        // VARCHAR works with many drivers regardless
+        // of the actual column type. Oddly, NULL and
+        // OTHER don't work with Oracle's drivers.
+<span class="fc" id="L247">        int sqlType = Types.VARCHAR;</span>
+<span class="fc" id="L248">        sqlType = statement.getParameterMetaData().getParameterType(i + 1);</span>
+<span class="fc" id="L249">        statement.setNull(i + 1, sqlType);</span>
+      }
+    }
+<span class="fc" id="L252">  }</span>
+  
+  
+  private &lt;T&gt; T run(FunctionWithException&lt;Connection, T&gt; consumer) throws Exception {
+<span class="fc" id="L256">    Connection c = connection.get();</span>
+    try {
+<span class="fc" id="L258">      return consumer.apply(c);</span>
+    } finally {
+<span class="pc" id="L260">      finalizer.accept(c);</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.2.201409121644</span></div></body></html>

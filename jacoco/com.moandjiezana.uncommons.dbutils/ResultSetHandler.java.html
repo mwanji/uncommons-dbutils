@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ResultSetHandler.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">uncommons-dbutils</a> &gt; <a href="index.source.html" class="el_package">com.moandjiezana.uncommons.dbutils</a> &gt; <span class="el_source">ResultSetHandler.java</span></div><h1>ResultSetHandler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.moandjiezana.uncommons.dbutils;
+
+import static com.moandjiezana.uncommons.dbutils.MapResultSetHandler.column;
+
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Converts {@link ResultSet}s to other objects.
+ *
+ * @param &lt;T&gt;
+ *    the target type the input {@link ResultSet} will be converted to.
+ */
+@FunctionalInterface
+public interface ResultSetHandler&lt;T&gt; {
+
+  /**
+   * Turn the {@link ResultSet} into an instance of T.
+   *
+   * @param rs
+   *    The {@link ResultSet} to handle. It has not been touched before being passed to this method.
+   *    
+   * @return An Object initialized with {@link ResultSet} data. Implementations may return &lt;code&gt;null&lt;/code&gt;.
+   *
+   * @throws Exception
+   *    if a database access error occurs
+   */
+  T handle(ResultSet rs) throws Exception;
+
+  /**
+   * @param rowProcessor
+   *    creates an instance of T
+   * @param &lt;T&gt;
+   *    the instance type
+   * @return an instance of T from the first row of the {@link ResultSet} or null, if the {@link ResultSet} is empty
+   */
+  static &lt;T&gt; ResultSetHandler&lt;T&gt; single(RowProcessor&lt;T&gt; rowProcessor) {
+<span class="fc" id="L57">    return rs -&gt; {</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">      if (!rs.next()) {</span>
+<span class="fc" id="L59">        return null;</span>
+      }
+
+<span class="fc" id="L62">      return rowProcessor.handle(rs);</span>
+    };
+  }
+  
+  /**
+   * @param resultSetHandler
+   *    processes the {@link ResultSet}
+   * @param &lt;T&gt;
+   *    the type of the instance wrapped in an {@link Optional}
+   * @return the result of invoking the underlying {@link ResultSetHandler}, wrapped in an {@link Optional}.
+   */
+  static &lt;T&gt; ResultSetHandler&lt;Optional&lt;T&gt;&gt; optional(ResultSetHandler&lt;T&gt; resultSetHandler) {
+<span class="fc" id="L74">    return rs -&gt; {</span>
+<span class="fc" id="L75">      return Optional.ofNullable(resultSetHandler.handle(rs));</span>
+    };
+  }
+
+  /**
+   * 
+   * @param rowProcessor
+   *    creates an instance of T
+   * @param &lt;T&gt;
+   *    the instance type
+   * @return a {@link List} of T or an empty {@link List} if the {@link ResultSet} is empty.
+   */
+  static &lt;T&gt; ResultSetHandler&lt;List&lt;T&gt;&gt; list(RowProcessor&lt;T&gt; rowProcessor) {
+<span class="fc" id="L88">    return rs -&gt; {</span>
+<span class="fc" id="L89">      List&lt;T&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">      while (rs.next()) {</span>
+<span class="fc" id="L91">        results.add(rowProcessor.handle(rs));</span>
+      }
+
+<span class="fc" id="L94">      return results;</span>
+    };
+  }
+  
+  /**
+   * @param keyColumn
+   *    the name of the column the map key can be extracted from
+   * @param keyClass
+   *    the type of the {@link Map} keys
+   * @param rowProcessor
+   *    creates an instance of V
+   * @param &lt;K&gt;
+   *    the type of the {@link Map} keys
+   * @param &lt;V&gt;
+   *    the type of the {@link Map} values
+   * 
+   * @return a {@link Map} with keys taken from keyColumn or an empty {@link Map} if the {@link ResultSet} is empty.
+   * 
+   * @see MapResultSetHandler
+   */
+  static &lt;K, V&gt; ResultSetHandler&lt;Map&lt;K, V&gt;&gt; map(String keyColumn, Class&lt;K&gt; keyClass, RowProcessor&lt;V&gt; rowProcessor) {
+<span class="fc" id="L115">    return new MapResultSetHandler&lt;&gt;(column(&quot;id&quot;, keyClass), rowProcessor);</span>
+  }
+
+  /**
+   * Returns nothing.
+   */
+<span class="fc" id="L121">  static ResultSetHandler&lt;Void&gt; VOID = rs -&gt; { return null; };</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.2.201409121644</span></div></body></html>

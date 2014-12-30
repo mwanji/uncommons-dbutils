@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>MapRowProcessor.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">uncommons-dbutils</a> &gt; <a href="index.source.html" class="el_package">com.moandjiezana.uncommons.dbutils</a> &gt; <span class="el_source">MapRowProcessor.java</span></div><h1>MapRowProcessor.java</h1><pre class="source lang-java linenums">package com.moandjiezana.uncommons.dbutils;
+
+import java.sql.ResultSet;
+import java.util.Map;
+
+import com.moandjiezana.uncommons.dbutils.functions.PredicateWithException;
+
+/**
+ * Converts a {@link ResultSet} row to a case-insensitive {@link Map}, which does not support null keys.
+ */
+public class MapRowProcessor implements RowProcessor&lt;Map&lt;String, Object&gt;&gt; {
+  
+  /**
+   * Restricts the processing to a single table
+   * @param tableName
+   *    only columns in this table are included in the {@link Map} 
+   * @return
+   *    a predicate that excludes columns from other tables
+   */
+  public static PredicateWithException&lt;ResultSet, Integer&gt; table(String tableName) {
+<span class="fc" id="L21">    return (rs, i) -&gt; rs.getMetaData().getTableName(i).equalsIgnoreCase(tableName);</span>
+  }
+
+  private final PredicateWithException&lt;ResultSet, Integer&gt; columnPredicate;
+  
+  public MapRowProcessor() {
+<span class="fc" id="L27">    this((rs, i) -&gt; true);</span>
+<span class="fc" id="L28">  }</span>
+  
+<span class="fc" id="L30">  public MapRowProcessor(PredicateWithException&lt;ResultSet, Integer&gt; columnPredicate) {</span>
+<span class="fc" id="L31">    this.columnPredicate = columnPredicate;</span>
+<span class="fc" id="L32">  }</span>
+
+  @Override
+  public Map&lt;String, Object&gt; handle(ResultSet resultSet) throws Exception {
+<span class="fc" id="L36">    Map&lt;String, Object&gt; map = new CaseInsensitiveMap&lt;Object&gt;();</span>
+    
+<span class="fc bfc" id="L38" title="All 2 branches covered.">    for (int i = 1; i &lt;= resultSet.getMetaData().getColumnCount(); i++) {</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">      if (!columnPredicate.test(resultSet, i)) {</span>
+<span class="fc" id="L40">        continue;</span>
+      }
+<span class="fc" id="L42">      map.put(resultSet.getMetaData().getColumnLabel(i), resultSet.getObject(i));</span>
+    }
+    
+<span class="fc" id="L45">    return map;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.2.201409121644</span></div></body></html>

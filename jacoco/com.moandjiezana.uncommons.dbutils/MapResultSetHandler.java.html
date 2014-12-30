@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>MapResultSetHandler.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">uncommons-dbutils</a> &gt; <a href="index.source.html" class="el_package">com.moandjiezana.uncommons.dbutils</a> &gt; <span class="el_source">MapResultSetHandler.java</span></div><h1>MapResultSetHandler.java</h1><pre class="source lang-java linenums">package com.moandjiezana.uncommons.dbutils;
+
+import java.sql.ResultSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
+
+/**
+ * Converts a {@link ResultSet} to a {@link Map} with one entry per row.
+ * 
+ * @param &lt;K&gt;
+ *    The type of the keys
+ * @param &lt;V&gt;
+ *    The type of the values
+ */
+public class MapResultSetHandler&lt;K,  V&gt; implements ResultSetHandler&lt;Map&lt;K,  V&gt;&gt; {
+  
+  /**
+   * Extracts the key from a single column.
+   * 
+   * @param column
+   *    the name of the column to extract the key from
+   * @param columnClass
+   *    the type of the column
+   * @param &lt;U&gt;
+   *    the type of the instance
+   * @return an instance of U
+   */
+  public static &lt;U&gt; FunctionWithException&lt;ResultSet, U&gt; column(String column, Class&lt;U&gt; columnClass) {
+<span class="fc" id="L31">    return rs -&gt; Converters.INSTANCE.convert(columnClass, rs.getObject(column));</span>
+  }
+  
+  private final FunctionWithException&lt;ResultSet, K&gt; keyExtractor;
+  private final RowProcessor&lt;V&gt; rowProcessor;
+
+  /**
+   * @param keyExtractor
+   *    Creates a {@link Map} key for each row
+   * @param rowProcessor
+   *    Creates a {@link Map} value for each row
+   */
+<span class="fc" id="L43">  public MapResultSetHandler(FunctionWithException&lt;ResultSet, K&gt; keyExtractor, RowProcessor&lt;V&gt; rowProcessor) {</span>
+<span class="fc" id="L44">    this.keyExtractor = keyExtractor;</span>
+<span class="fc" id="L45">    this.rowProcessor = rowProcessor;</span>
+<span class="fc" id="L46">  }</span>
+
+  /**
+   * @return an empty {@link Map} if the {@link ResultSet} is empty
+   */
+  @Override
+  public Map&lt;K,  V&gt; handle(ResultSet rs) throws Exception {
+<span class="fc" id="L53">    LinkedHashMap&lt;K,  V&gt; map = new LinkedHashMap&lt;&gt;();</span>
+    
+<span class="fc bfc" id="L55" title="All 2 branches covered.">    while (rs.next()) {</span>
+<span class="fc" id="L56">      map.put(keyExtractor.apply(rs), rowProcessor.handle(rs));</span>
+    }
+    
+<span class="fc" id="L59">    return map;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.2.201409121644</span></div></body></html>

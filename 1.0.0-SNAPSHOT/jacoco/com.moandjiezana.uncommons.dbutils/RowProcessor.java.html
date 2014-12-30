@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>RowProcessor.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">uncommons-dbutils</a> &gt; <a href="index.source.html" class="el_package">com.moandjiezana.uncommons.dbutils</a> &gt; <span class="el_source">RowProcessor.java</span></div><h1>RowProcessor.java</h1><pre class="source lang-java linenums">package com.moandjiezana.uncommons.dbutils;
+
+import java.sql.ResultSet;
+import java.util.Optional;
+
+/**
+ * Converts a {@link ResultSet} to an instance of T
+ * 
+ * @param &lt;T&gt;
+ *    the type a row is converted to
+ */
+@FunctionalInterface
+public interface RowProcessor&lt;T&gt; {
+
+  /**
+   * @param resultSet
+   *    already pointing to the row to be processed
+   * @return
+   *    an instance of T
+   * @throws Exception
+   *    if something goes wrong
+   */
+  T handle(ResultSet resultSet) throws Exception;
+
+  /**
+   * @param &lt;T&gt;
+   *    the type to convert the column to
+   * @return
+   *    {@link RowProcessor} that gets the first column of the row
+   * @see ColumnRowProcessor
+   */
+  static &lt;T&gt; RowProcessor&lt;T&gt; firstColumn() {
+<span class="fc" id="L33">    return firstColumn(null);</span>
+  }
+
+  /**
+   * @param objectClass
+   *    Specify the class when a conversion is necessary
+   * @param &lt;T&gt;
+   *    the type to convert the column to
+   * @return
+   *    {@link RowProcessor} that gets the first column of the row
+   * @see ColumnRowProcessor
+   */
+  static &lt;T&gt; RowProcessor&lt;T&gt; firstColumn(Class&lt;T&gt; objectClass) {
+<span class="fc" id="L46">    return new ColumnRowProcessor&lt;T&gt;(1, objectClass);</span>
+  }
+
+  /**
+   * @param rowProcessor
+   *    performs the processing
+   * @param &lt;T&gt;
+   *    the type a row is converted to
+   * @return
+   *    the result of processing, wrapped in an {@link Optional}
+   */
+  static &lt;T&gt; RowProcessor&lt;Optional&lt;T&gt;&gt; optional(RowProcessor&lt;T&gt; rowProcessor) {
+<span class="fc" id="L58">    return rs -&gt; Optional.ofNullable(rowProcessor.handle(rs));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.2.201409121644</span></div></body></html>
