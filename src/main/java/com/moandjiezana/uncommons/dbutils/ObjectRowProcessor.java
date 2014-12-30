@@ -58,21 +58,17 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
         String jdbcTableName = rs.getMetaData().getTableName(i).toLowerCase();
         if (tablePredicate.test(jdbcTableName)) {
           String columnLabel = rs.getMetaData().getColumnLabel(i).toLowerCase();
-          try {
-            Field field = columnToFieldMapper.apply(objectClass, columnLabel);
-            if (field == null) {
-              continue;
-            }
-            field.setAccessible(true);
-            if (field.getType() == boolean.class) {
-              field.set(instance, rs.getBoolean(i));
-            } else if (field.getType() == int.class) {
-              field.set(instance, rs.getInt(i));
-            } else {
-              field.set(instance, converters.convert(field.getType(), rs.getObject(i)));
-            }
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          Field field = columnToFieldMapper.apply(objectClass, columnLabel);
+          if (field == null) {
+            continue;
+          }
+          field.setAccessible(true);
+          if (field.getType() == boolean.class) {
+            field.set(instance, rs.getBoolean(i));
+          } else if (field.getType() == int.class) {
+            field.set(instance, rs.getInt(i));
+          } else {
+            field.set(instance, converters.convert(field.getType(), rs.getObject(i)));
           }
         }
         
