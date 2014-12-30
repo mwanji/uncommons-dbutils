@@ -18,6 +18,8 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
@@ -80,14 +82,23 @@ public class QueryRunnerTest {
     Instant now = Instant.now();
     Long id = queryRunner.insert("INSERT INTO tbl(name, instant, active, amount, num) VALUES(?,?,?,?,?)", single(firstColumn()), "abc1", Timestamp.from(now), true, BigDecimal.valueOf(1.13), 5);
     
-    Tbl tbl = queryRunner.select("SELECT * FROM tbl WHERE id=?", single(tblRowProcessor), id);
+    Tbl tbl = queryRunner.select("SELECT id, name, instant, active, active AS active2, amount, num FROM tbl WHERE id=?", single(tblRowProcessor), id);
     
     assertEquals(1L, tbl.id.longValue());
     assertEquals("abc1", tbl.name);
     assertEquals(now, tbl.instant);
     assertTrue(tbl.active);
+    assertTrue(tbl.active2);
     assertEquals(BigDecimal.valueOf(1.13), tbl.amount);
     assertEquals(5, tbl.num);
+  }
+  
+  @Test
+  public void should_convert_boolean() throws Exception {
+    Long id = queryRunner.insert("INSERT INTO tbl(active) VALUES(?)", single(firstColumn()), true);
+    
+    Tbl tbl = queryRunner.select("SELECT active AS active2 FROM tbl WHERE id=?", single(tblRowProcessor), id);
+    
   }
   
   @Test
@@ -217,6 +228,58 @@ public class QueryRunnerTest {
     assertThat(tbls, contains(result1, result2));
   }
   
+  @Test
+  public void should_not_save_if_auto_commit_is_off() throws Exception {
+    try (Connection c1 = DriverManager.getConnection("jdbc:h2:mem:test"); Connection c2 = DriverManager.getConnection("jdbc:h2:mem:test");) {
+      QueryRunner queryRunner = QueryRunner.create(c1);
+      queryRunner.execute("CREATE SCHEMA unit_test");
+      queryRunner.execute("SET SCHEMA unit_test");
+      queryRunner.execute("CREATE TABLE tbl (name VARCHAR(255))");
+
+      QueryRunner.create(c1).initializeWith(conn -> conn.setAutoCommit(false)).insert("INSERT INTO tbl(name) VALUES(?)", VOID, "abc");
+      QueryRunner queryRunner2 = QueryRunner.create(c2);
+      Long count = queryRunner2.select("SELECT COUNT(name) FROM unit_test.tbl", single(firstColumn()));
+      assertEquals(0, count.intValue());
+      
+      c1.commit();
+      
+      count = queryRunner2.select("SELECT COUNT(name) FROM unit_test.tbl", single(firstColumn()));
+      assertEquals(1, count.intValue());
+    }
+  }
+  
+  @Test
+  public void should_run_in_transaction() throws Exception {
+    queryRunner.tx((qr, tx) -> {
+      qr.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "a");
+      tx.rollback();
+      qr.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "b");
+      tx.commit();
+    });
+    
+    String name = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(firstColumn()), 1L);
+    
+    assertEquals("b", name);
+  }
+  
+  @Test
+  public void should_map_column_with_valueOf() throws Exception {
+    queryRunner.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "a");
+    
+    ValueOf valueOf = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(firstColumn(ValueOf.class)), 1L);
+    
+    assertEquals("a", valueOf.value);
+  }
+  
+  @Test
+  public void should_set_object_field_to_null_if_not_found_in_result_set() throws Exception {
+    queryRunner.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "a");
+    
+    ValueOf valueOf = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ObjectRowProcessor<ValueOf>(ValueOf.class, (cl, col) -> { return null; })), 1L);
+    
+    assertNull(valueOf.value);
+  }
+  
   private static class Tbl {
     private Long id;
     private String name;
@@ -224,6 +287,7 @@ public class QueryRunnerTest {
     private Boolean active;
     private BigDecimal amount;
     private int num;
+    private boolean active2;
   }
   
   private static class TblUnderscore {
@@ -233,6 +297,16 @@ public class QueryRunnerTest {
     private Boolean isActive;
     private BigDecimal amountOwed;
     private int numOwned;
+  }
+  
+  private static class ValueOf {
+    private String value;
+    
+    public static ValueOf valueOf(String value) {
+      ValueOf valueOf = new ValueOf();
+      valueOf.value = value;
+      return valueOf;
+    }
   }
   
   
