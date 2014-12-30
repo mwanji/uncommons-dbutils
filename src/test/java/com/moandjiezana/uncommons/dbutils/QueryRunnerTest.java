@@ -4,7 +4,7 @@ import static com.moandjiezana.uncommons.dbutils.MapRowProcessor.table;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.VOID;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.list;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.map;
-import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.maybe;
+import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.optional;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.single;
 import static com.moandjiezana.uncommons.dbutils.RowProcessor.firstColumn;
 import static java.util.Arrays.asList;
@@ -63,6 +63,16 @@ public class QueryRunnerTest {
     List<String> names = queryRunner.select("SELECT name FROM tbl ORDER BY name ASC", list(firstColumn()));
     
     assertThat(names, contains("111", "222", "333"));
+  }
+  
+  @Test
+  @SuppressWarnings("unchecked")
+  public void should_wrap_second_column_in_optional() throws Exception {
+    queryRunner.batchInsert("INSERT INTO tbl(name) VALUES(?)", ResultSetHandler.VOID, asList(singletonList("111"), singletonList(null), singletonList("333")));
+    
+    List<Optional<String>> names = queryRunner.select("SELECT id, name FROM tbl ORDER BY id ASC", list(RowProcessor.optional(new ColumnRowProcessor<String>(2))));
+    
+    assertThat(names, contains(Optional.of("111"), Optional.empty(), Optional.of("333")));
   }
   
   @Test
@@ -150,8 +160,8 @@ public class QueryRunnerTest {
   @Test
   public void should_return_optional() throws Exception {
     queryRunner.insert("INSERT INTO tbl(id) VALUES(?)", VOID, 1L);
-    Optional<Tbl> present = queryRunner.select("SELECT * FROM tbl WHERE id = ?", maybe(tblRowProcessor), 1L);
-    Optional<Tbl> absent = queryRunner.select("SELECT * FROM tbl WHERE id = ?", maybe(tblRowProcessor), 2L);
+    Optional<Tbl> present = queryRunner.select("SELECT * FROM tbl WHERE id = ?", optional(single(tblRowProcessor)), 1L);
+    Optional<Tbl> absent = queryRunner.select("SELECT * FROM tbl WHERE id = ?", optional(single(tblRowProcessor)), 2L);
     
     assertEquals(1L, present.get().id.longValue());
     assertFalse(absent.isPresent());
