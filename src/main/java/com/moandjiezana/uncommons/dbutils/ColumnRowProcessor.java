@@ -20,65 +20,78 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 /**
- * <code>RowProcessor</code> implementation that converts one
- * <code>ResultSet</code> column into an Object. This class is thread safe.
- *
+ * Converts the specified {@link ResultSet} column into an instance of T. This class is thread safe.
+ * 
  * @param <T>
- *          The type of the scalar
+ *    The type of the column. When no class is specified via the constructor, this must match or be a super-type of what is returned by the {@link ResultSet}.
  */
 public class ColumnRowProcessor<T> implements RowProcessor<T> {
   
   private final int columnIndex;
   private final String columnName;
+  private final Class<T> objectClass;
 
   /**
-   * Creates a new instance of ScalarHandler.
-   *
+   * 
    * @param columnIndex
-   *          The index of the column to retrieve from the
-   *          <code>ResultSet</code>.
+   *    The index of the column to retrieve from the {@link ResultSet}.
    */
   public ColumnRowProcessor(int columnIndex) {
     this(columnIndex, null);
   }
 
   /**
-   * Creates a new instance of ScalarHandler.
-   *
+   * @param columnIndex
+   *    The index of the column to retrieve from the {@link ResultSet}.
+   * @param objectClass
+   *    The class of the returned instance. Makes custom conversion possible.
+   */
+  public ColumnRowProcessor(int columnIndex, Class<T> objectClass) {
+    this(columnIndex, null, objectClass);
+  }
+  
+  /**
    * @param columnName
-   *          The name of the column to retrieve from the <code>ResultSet</code>
+   *    The name of the column to retrieve from the {@link ResultSet}.
    */
   public ColumnRowProcessor(String columnName) {
-    this(1, columnName);
-  }
-
-  private ColumnRowProcessor(int columnIndex, String columnName) {
-    this.columnIndex = columnIndex;
-    this.columnName = columnName;
+    this(columnName, null);
   }
 
   /**
-   * Returns one <code>ResultSet</code> column as an object via the
-   * <code>ResultSet.getObject()</code> method that performs type conversions.
-   * 
-   * @param rs
-   *          <code>ResultSet</code> to process.
-   * @return The column or <code>null</code> if there are no rows in the
-   *         <code>ResultSet</code>.
-   *
-   * @throws SQLException
-   *           if a database access error occurs
-   * @throws ClassCastException
-   *           if the class datatype does not match the column type
+   * @param columnName
+   *    The name of the column to retrieve from the {@link ResultSet}.
+   * @param objectClass
+   *    The class of the returned instance. Makes custom conversion possible.
    */
-  // We assume that the user has picked the correct type to match the column
-  // so getObject will return the appropriate type and the cast will succeed.
+  public ColumnRowProcessor(String columnName, Class<T> objectClass) {
+    this(0, columnName, objectClass);
+  }
+
+  /**
+   * @param rs
+   *    {@link ResultSet} to process.
+   * @return an instance of T, either by conversion if a class was specified or by casting.
+   * @throws SQLException
+   *    if a database access error occurs
+   * @throws ClassCastException
+   *    if no class was specified and T does not match the column type
+   */
   @SuppressWarnings("unchecked")
   @Override
   public T handle(ResultSet rs) throws SQLException {
-    if (this.columnName == null) {
-      return (T) rs.getObject(this.columnIndex);
+    Object raw = this.columnIndex == 0 ? rs.getObject(columnName) : rs.getObject(columnIndex);
+    
+    if (objectClass == null) {
+      return (T) raw;
     }
-    return (T) rs.getObject(this.columnName);
+    
+    return Converters.INSTANCE.convert(objectClass, raw);
+  }
+
+  private ColumnRowProcessor(int columnIndex, String columnName, Class<T> objectClass) {
+    this.columnIndex = columnIndex;
+    this.columnName = columnName;
+    this.objectClass = objectClass;
   }
 }
