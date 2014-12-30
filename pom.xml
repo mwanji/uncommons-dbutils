@@ -1,4 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.sonatype.oss</groupId>
@@ -9,7 +10,7 @@
   <artifactId>uncommons-dbutils</artifactId>
   <version>1.0.0-SNAPSHOT</version>
   <name>uncommons-dbutils</name>
-  <description>An improved fork of Apache Commons DBUtils</description>
+  <description>A modernised fork of Apache Commons DBUtils</description>
   <build>
     <plugins>
       <plugin>
@@ -20,6 +21,36 @@
           <source>1.8</source>
           <target>1.8</target>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-site-plugin</artifactId>
+        <version>3.4</version>
+        <configuration>
+          <outputDirectory>${project.reporting.outputDirectory}/${project.version}</outputDirectory>
+        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>lt.velykis.maven.skins</groupId>
+            <artifactId>reflow-velocity-tools</artifactId>
+            <version>1.1.1</version>
+          </dependency>
+          <dependency>
+            <groupId>org.apache.velocity</groupId>
+            <artifactId>velocity</artifactId>
+            <version>1.7</version>
+          </dependency>
+          <dependency>
+            <groupId>org.apache.maven.doxia</groupId>
+            <artifactId>doxia-module-markdown</artifactId>
+            <version>1.6</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-project-info-reports-plugin</artifactId>
+        <version>2.7</version>
       </plugin>
     </plugins>
   </build>
@@ -43,4 +74,53 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.10.1</version>
+        <configuration>
+        </configuration>
+        <reportSets>
+          <reportSet>
+            <id>api-only</id>
+            <reports>
+              <report>javadoc</report>
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
+    </plugins>
+  </reporting>
+  <url>https://mwanji.github.io/uncommons-dbutils</url>
+  <inceptionYear>2014</inceptionYear>
+  <issueManagement>
+    <url>https://github.com/mwanji/uncommons-dbutils/issues</url>
+    <system>Github Issues</system>
+  </issueManagement>
+  <licenses>
+    <license>
+      <name>Apache License 2.0</name>
+      <url>http://opensource.org/licenses/Apache-2.0</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>mwanji</id>
+      <email>mwanji@gmail.com</email>
+      <name>Moandji Ezana</name>
+      <url>http://moandjiezana.com</url>
+      <roles>
+        <role>developer</role>
+      </roles>
+      <timezone>+2</timezone>
+    </developer>
+  </developers>
+  <scm>
+    <url>https://github.com/mwanji/uncommons-dbutils</url>
+    <connection>scm:git:git://github.com/mwanji/uncommons-dbutils.git</connection>
+    <developerConnection>scm:git:git://github.com/mwanji/uncommons-dbutils.git</developerConnection>
+  </scm>
 </project>

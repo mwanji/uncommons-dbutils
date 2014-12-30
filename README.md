@@ -1,14 +1,14 @@
 # uncommons-dbutils
 
-A modernised fork of [Apache Commons DBUtils](http://commons.apache.org/proper/commons-dbutils/). The aim is to make a more flexible API and fix previous design mistakes, while keeping the original's small size and tight focus. 
+A modernised fork of [Apache Commons DBUtils](http://commons.apache.org/proper/commons-dbutils/). The aim is to make a more flexible API and fix previous design mistakes, while keeping the original's small size and tight focus.
 
-## Requirements
-
-Java 8
+Full documentation is at https://mwanji.github.io/uncommons-dbutils
 
 ## Installation
 
-Add the following dependency:
+Requires Java 8.
+
+For Maven, add the following dependency:
 
 ```xml
 <dependency>
@@ -17,6 +17,8 @@ Add the following dependency:
   <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
+http://mwanji.github.io/uncommons-dbutils/dependency-info.html
+See [here](https://mwanji.github.io/uncommons-dbutils/dependency-info.html) for other dependency management systems.
 
 ## Examples
 
@@ -54,20 +56,4 @@ try (Connection connection = // obtain connection) {
 }
 ```
 
-## QueryRunner
-
-A QueryRunner manages the database connection and executes queries. It can use either a `DataSource` or a `Connection`. When a `Connection` is used, it is up to you to close it.
-
-## ResultSetHandler
-
-A functional interface that manages the `ResultSet` and determines what it will be converted to. The built-in `ResultSetHander`s are:
-
-* ResultSetHandler.single: Returns an object created by the passed in `RowProcessor`, or null if the `ResultSet` is empty
-* ResultSetHandler.list: Returns a list populated by the `RowProcessor`, or an empty `List` if the `ResultSet` is empty
-* ResultSetHandler.map: A shorthand way of creating a `MapResultSetHandler` that uses a single column as the entries' key
-* ResultSetHandler.optional: Delegates processing to another `ResultSetHandler`, then wraps the returned value in an `Optional`
-* ResultSetHandler.VOID: discards the `ResultSet`
-
-## RowProcessor
-
-Converts a `ResultSet` row into something else.
+Find out more at https://mwanji.github.io/uncommons-dbutils

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project
+xmlns="http://maven.apache.org/DECORATION/1.3.0"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://maven.apache.org/DECORATION/1.3.0 http://maven.apache.org/xsd/decoration-1.3.0.xsd">
+
+  <publishDate position="bottom" />
+  <version position="none" />
+
+  <skin>
+    <!--groupId>org.apache.maven.skins</groupId>
+    <artifactId>maven-fluido-skin</artifactId>
+    <version>1.3.1</version-->
+    <groupId>lt.velykis.maven.skins</groupId>
+    <artifactId>reflow-maven-skin</artifactId>
+    <version>1.1.1</version>
+  </skin>
+
+  <body>
+    <head>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/highlight.min.js"></script>
+      <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/styles/${highlightJsTheme}.min.css" rel="stylesheet" />
+    </head>
+    <links>
+      <item name="Fork on Github" href="https://github.com/mwanji/uncommons-dbutils" />
+    </links>
+    <menu name="API">
+      <item name="Current" href="apidocs/index.html" />
+    </menu>
+    <footer>
+    <![CDATA[
+    Released under the <a href="http://opensource.org/licenses/Apache-2.0">Apache 2.0 License</a>
+    ]]>
+    </footer>
+  </body>
+
+  <custom>
+    <reflowSkin>
+      <brand>
+        <name>uncommons-dbutils</name>
+        <href>https://mwanji.github.io/uncommons-dbutils</href>
+      </brand>
+      <theme>bootswatch-flatly</theme>
+      <bottomDescription>
+        <![CDATA[
+        uncommons-dbutils is a modern rethink of <a href="http://commons.apache.org/proper/commons-dbutils/">Apache Commons DbUtils</a> by <a href="http://moandjiezana.com">Moandji Ezana</a>.<br />
+        Currently at ${project.version}<br/>
+        Released under the <a href="http://opensource.org/licenses/Apache-2.0">Apache 2.0 License</a>
+        ]]>
+      </bottomDescription>
+      <highlightJs>true</highlightJs>
+      <highlightJsTheme>hybrid</highlightJsTheme>
+      <protocolRelativeURLs>true</protocolRelativeURLs>
+    </reflowSkin>
+    <!--fluidoSkin>
+      <topBarEnabled>true</topBarEnabled>
+      <sideBarEnabled>false</sideBarEnabled>
+       <gitHub>
+        <projectId>mwanji/uncommons-dbutils</projectId>
+        <ribbonOrientation>right</ribbonOrientation>
+        <ribbonColor>gray</ribbonColor>
+      </gitHub>
+    </fluidoSkin-->
+  </custom>
+</project>
