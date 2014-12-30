@@ -30,7 +30,20 @@ public interface RowProcessor<T> {
    * @see ColumnRowProcessor
    */
   static <T> RowProcessor<T> firstColumn() {
-    return new ColumnRowProcessor<T>(1);
+    return firstColumn(null);
+  }
+
+  /**
+   * @param objectClass
+   *    Specify the class when a conversion is necessary
+   * @param <T>
+   *    the type to convert the column to
+   * @return
+   *    {@link RowProcessor} that gets the first column of the row
+   * @see ColumnRowProcessor
+   */
+  static <T> RowProcessor<T> firstColumn(Class<T> objectClass) {
+    return new ColumnRowProcessor<T>(1, objectClass);
   }
 
   /**
