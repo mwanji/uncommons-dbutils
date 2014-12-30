@@ -60,7 +60,13 @@ A QueryRunner manages the database connection and executes queries. It can use e
 
 ## ResultSetHandler
 
-Manages the `ResultSet` and determines what it will be converted to.
+A functional interface that manages the `ResultSet` and determines what it will be converted to. The built-in `ResultSetHander`s are:
+
+* ResultSetHandler.single: Returns an object created by the passed in `RowProcessor`, or null if the `ResultSet` is empty
+* ResultSetHandler.list: Returns a list populated by the `RowProcessor`, or an empty `List` if the `ResultSet` is empty
+* ResultSetHandler.map: A shorthand way of creating a `MapResultSetHandler` that uses a single column as the entries' key
+* ResultSetHandler.optional: Delegates processing to another `ResultSetHandler`, then wraps the returned value in an `Optional`
+* ResultSetHandler.VOID: discards the `ResultSet`
 
 ## RowProcessor
 
