@@ -25,6 +25,9 @@ import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
 
+/*
+ * Uses the Connection given to it, so it is up to the caller to manage it.
+ */
 class ConnectionQueryRunner implements QueryRunner {
 
   private final Connection connection;
@@ -77,7 +80,7 @@ class ConnectionQueryRunner implements QueryRunner {
   }
 
   @Override
-  public <T> T batch(String sql, ResultSetHandler<T> resultSetHandler, List<List<Object>> batchParams) throws Exception {
+  public <T> T batchInsert(String sql, ResultSetHandler<T> resultSetHandler, List<List<Object>> batchParams) throws Exception {
     try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
       for (List<Object> params : batchParams) {
         this.fillStatement(stmt, params);

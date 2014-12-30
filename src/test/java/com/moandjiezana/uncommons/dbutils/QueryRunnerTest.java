@@ -58,7 +58,7 @@ public class QueryRunnerTest {
 
   @Test
   public void should_select_first_column_of_multiple_rows() throws Exception {
-    queryRunner.batch("INSERT INTO tbl(name) VALUES(?)", ResultSetHandler.VOID, asList(singletonList("111"), singletonList("222"), singletonList("333")));
+    queryRunner.batchInsert("INSERT INTO tbl(name) VALUES(?)", ResultSetHandler.VOID, asList(singletonList("111"), singletonList("222"), singletonList("333")));
     
     List<String> names = queryRunner.select("SELECT name FROM tbl ORDER BY name ASC", list(firstColumn()));
     

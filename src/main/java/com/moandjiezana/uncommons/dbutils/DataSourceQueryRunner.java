@@ -5,6 +5,11 @@ import java.util.List;
 
 import javax.sql.DataSource;
 
+import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
+
+/*
+ * Each method opens and closes a Connection taken from the DataSource
+ */
 class DataSourceQueryRunner implements QueryRunner {
   
   private final DataSource dataSource;
@@ -34,17 +39,13 @@ class DataSourceQueryRunner implements QueryRunner {
   }
 
   @Override
-  public <T> T batch(String sql, ResultSetHandler<T> resultSetHandler, List<List<Object>> params) throws Exception {
-    return run(qr -> qr.batch(sql, resultSetHandler, params));
+  public <T> T batchInsert(String sql, ResultSetHandler<T> resultSetHandler, List<List<Object>> params) throws Exception {
+    return run(qr -> qr.batchInsert(sql, resultSetHandler, params));
   }
   
-  private <T> T run(QueryFunction<T> f) throws Exception {
+  private <T> T run(FunctionWithException<QueryRunner, T> f) throws Exception {
     try (Connection connection = dataSource.getConnection()) {
       return f.apply(QueryRunner.create(connection));
     }
-  }
-  
-  private static interface QueryFunction<R> {
-    R apply(QueryRunner queryRunner) throws Exception;
   }
 }
