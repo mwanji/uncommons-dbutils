@@ -23,6 +23,8 @@ public interface RowProcessor<T> {
   T handle(ResultSet resultSet) throws Exception;
 
   /**
+   * @param <T>
+   *    the type to convert the column to
    * @return
    *    {@link RowProcessor} that gets the first column of the row
    * @see ColumnRowProcessor

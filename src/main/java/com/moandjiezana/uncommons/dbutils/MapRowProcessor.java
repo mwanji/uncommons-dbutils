@@ -11,9 +11,11 @@ import com.moandjiezana.uncommons.dbutils.functions.PredicateWithException;
 public class MapRowProcessor implements RowProcessor<Map<String, Object>> {
   
   /**
-   * Restricts the 
+   * Restricts the processing to a single table
    * @param tableName
+   *    only columns in this table are included in the {@link Map} 
    * @return
+   *    a predicate that excludes columns from other tables
    */
   public static PredicateWithException<ResultSet, Integer> table(String tableName) {
     return (rs, i) -> rs.getMetaData().getTableName(i).equalsIgnoreCase(tableName);
