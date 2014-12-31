@@ -77,7 +77,9 @@
         <artifactId>coveralls-maven-plugin</artifactId>
         <version>3.0.1</version>
         <configuration>
-          <jacocoReports>${project.reporting.outputDirectory}/${project.version}/jacoco</jacocoReports>
+          <jacocoReports>
+            <param>${project.reporting.outputDirectory}/${project.version}/jacoco</param>
+          </jacocoReports>
         </configuration>
       </plugin>
     </plugins>
