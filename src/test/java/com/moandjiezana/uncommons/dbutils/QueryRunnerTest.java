@@ -37,7 +37,7 @@ import com.moandjiezana.uncommons.dbutils.junit.TemporaryConnection;
 public class QueryRunnerTest {
 
   @Rule
-  public final TemporaryConnection connection = new TemporaryConnection("jdbc:h2:mem:");
+  public final TemporaryConnection connection = new TemporaryConnection("jdbc:h2:mem:;TRACE_LEVEL_SYSTEM_OUT=2");
   private QueryRunner queryRunner;
   private final ObjectRowProcessor<Tbl> tblRowProcessor = new ObjectRowProcessor<Tbl>(Tbl.class, ObjectRowProcessor.matching());
 
@@ -46,7 +46,7 @@ public class QueryRunnerTest {
     queryRunner = QueryRunner.create(connection.get());
     queryRunner.execute("CREATE SCHEMA unit_test");
     queryRunner.execute("SET SCHEMA unit_test");
-    queryRunner.execute("CREATE TABLE tbl (id BIGINT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), instant TIMESTAMP, active BOOLEAN, amount DECIMAL(5,2), num INT)");
+    queryRunner.execute("CREATE TABLE tbl (id IDENTITY PRIMARY KEY, name VARCHAR(255), instant TIMESTAMP, active BOOLEAN, amount DECIMAL(5,2), num INT)");
     queryRunner.execute("CREATE TABLE tbl_underscore (id_tbl BIGINT AUTO_INCREMENT PRIMARY KEY, name_of VARCHAR(255), instant_at TIMESTAMP, is_active BOOLEAN, amount_owed DECIMAL(5,2), num_owned INT)");
   }
 
@@ -274,6 +274,20 @@ public class QueryRunnerTest {
     ValueOf valueOf = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ObjectRowProcessor<ValueOf>(ValueOf.class, (cl, col) -> { return null; })), 1L);
     
     assertNull(valueOf.value);
+  }
+  
+  @Test
+  public void should_select_with_null_param() throws Exception {
+    queryRunner.batch("INSERT INTO tbl(name, amount) VALUES(?,?)", asList(asList("a", 1L), asList("b", null), asList(null, 3L)));
+    
+    Object nullObject = null;
+    List<String> nullAmount = queryRunner.select("SELECT name FROM tbl WHERE amount IS ?", list(firstColumn()), nullObject);
+    List<BigDecimal> nullName = queryRunner.select("SELECT amount FROM tbl WHERE name IS NOT DISTINCT FROM ?", list(firstColumn()), nullObject);
+    List<String> eitherNull = queryRunner.select("SELECT CONCAT(IFNULL(tbl.name, 'null'), '-', IFNULL(amount, 'null')) FROM tbl WHERE name IS ? OR amount IS ?", list(firstColumn()), nullObject, nullObject);
+    
+    assertThat(nullAmount, contains("b"));
+    assertThat(nullName, contains(BigDecimal.valueOf(300, 2)));
+    assertThat(eitherNull, contains("b-null", "null-3.00"));
   }
   
   private static class Tbl {
