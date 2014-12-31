@@ -30,11 +30,6 @@ xsi:schemaLocation="http://maven.apache.org/DECORATION/1.3.0 http://maven.apache
     <menu name="Reports">
       <item name="Code Coverage" href="jacoco/index.html" />
     </menu>
-    <footer>
-    <![CDATA[
-    Released under the <a href="http://opensource.org/licenses/Apache-2.0">Apache 2.0 License</a>
-    ]]>
-    </footer>
   </body>
 
   <custom>
@@ -51,8 +46,9 @@ xsi:schemaLocation="http://maven.apache.org/DECORATION/1.3.0 http://maven.apache
         Released under the <a href="http://opensource.org/licenses/Apache-2.0">Apache 2.0 License</a>
         ]]>
       </bottomDescription>
-      <highlightJs>true</highlightJs>
+      <highlightJs>false</highlightJs>
       <highlightJsTheme>hybrid</highlightJsTheme>
+      <imgLightbox>false</imgLightbox>
       <protocolRelativeURLs>false</protocolRelativeURLs>
     </reflowSkin>
   </custom>
