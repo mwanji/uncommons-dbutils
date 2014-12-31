@@ -4,6 +4,8 @@ A modernised fork of [Apache Commons DBUtils](http://commons.apache.org/proper/c
 
 Full documentation is at https://mwanji.github.io/uncommons-dbutils
 
+[![Build Status](https://img.shields.io/travis/mwanji/uncommons-dbutils.svg)](https://travis-ci.org/mwanji/uncommons-dbutils) [![Coverage Status](https://img.shields.io/coveralls/mwanji/uncommons-dbutils.svg)](https://coveralls.io/r/mwanji/uncommons-dbutils?branch=master)
+
 ## Installation
 
 Requires Java 8.
