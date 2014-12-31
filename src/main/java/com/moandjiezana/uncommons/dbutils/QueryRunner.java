@@ -20,6 +20,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 
 import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
 import com.moandjiezana.uncommons.dbutils.functions.ConsumerWithException;
@@ -71,30 +73,38 @@ public class QueryRunner {
   public QueryRunner initializeWith(ConsumerWithException<Connection> initializer) {
     return new QueryRunner(connection.andThen(initializer), finalizer);
   }
+
+  public AsyncQueryRunner toAsync() {
+    return toAsync(ForkJoinPool.commonPool());
+  }
+
+  public AsyncQueryRunner toAsync(Executor executor) {
+    return new AsyncQueryRunner(this, executor);
+  }
   
   /**
    * <p>
-   * SQL NOTE:<br/>
-   * If you wish to use possibly <code>null</code> values in a WHERE clause's params, do not use "= ?", as in SQL <code>NULL = NULL</code> and <code>NULL <> NULL</code> will not return <code>true</code>.
+   * SQL NOTE:
+   * If you wish to use possibly <code>null</code> values in a WHERE clause's params, do not use "= ?", as in SQL <code>NULL = NULL</code> and <code>NULL &lt;&gt; NULL</code> will not return <code>true</code>.
    * Use <code>IS DISTINCT FROM ?</code> or <code>IS NOT DISTINCT FROM ?</code> instead.
    * </p>
    * 
    * <p>
    * Known to be supported in:
+   * </p>
    * <ul>
    *  <li><a href="https://wiki.postgresql.org/wiki/Is_distinct_from">PostgreSQL</a></li>
    *  <li><a href="http://h2database.com/html/grammar.html#condition_right_hand_side">H2</a> (also aliased to <code>IS [NOT] ?</code>)</li>
    * </ul>
-   * </p>
    * 
    * <p>
    * Alternatives:
+   * </p>
    * <ul>
    *  <li><a href="http://dev.mysql.com/doc/refman/5.6/en/comparison-operators.html#operator_equal-to">MySQL</a> uses <code>&lt;=&gt;</code></li>
    *  <li><a href="https://mariadb.com/kb/en/mariadb/documentation/functions-and-operators/operators/comparison-operators/null-safe-equal/">MariaDB</a> uses <code>&lt;=&gt;</code></li>
    *  <li><a href="http://www.sqlite.org/lang_expr.html#binaryops">SQLite</a> uses <code>IS [NOT] ?</code></li>
    * </ul>
-   * </p>
    * 
    * <p>
    * See <a href="http://blog.jooq.org/2012/09/21/the-is-distinct-from-predicate/">http://blog.jooq.org/2012/09/21/the-is-distinct-from-predicate/</a> for more info.
@@ -226,24 +236,29 @@ public class QueryRunner {
    * <p>Provides a {@link QueryRunner} that can be used in a transaction.</p>
    * 
    * <p>The underlying {@link Connection} is configured in the same way as any other {@link Connection} from this {@link QueryRunner}, except that
-   * {@link Connection#setAutoCommit(boolean)} is set to false before any calls are made and set to true afterwards.</p>
+   * {@link Connection#setAutoCommit(boolean)} is set to false before any calls are made and set back to its previous state afterwards.</p>
    * 
-   * <p>Make sure to call {@link Connection#commit()} or {@link Connection#rollback()}!</p>
+   * <p>
+   * Make sure to call {@link Connection#rollback()} or {@link Connection#commit()} if necessary!
+   * As {@link Connection#setAutoCommit(boolean)} is called after the transaction is complete, if it is set to <code>true</code>,
+   * then any pending queries will be committed. Also, leaving pending transactions could have side-effects when the {@link Connection} is reused.
+   * </p>
    * 
    * @param txQueryRunner
-   *    Make sure to use this {@link QueryRunner} in the transaction block
+   *    Make sure to use the {@link QueryRunner} passed to this lamba!
    * @throws Exception
    *    if anything goes wrong
    */
   public void tx(BiConsumerWithException<QueryRunner, QueryRunner.Transaction> txQueryRunner) throws Exception {
     Connection _connection = connection.get();
+    boolean originalAutoCommit = _connection.getAutoCommit();
     _connection.setAutoCommit(false);
     QueryRunner queryRunner = new QueryRunner(() -> _connection, c -> {});
     try {
       txQueryRunner.accept(queryRunner, new QueryRunner.Transaction(_connection));
     } finally {
       finalizer.accept(_connection);
-      _connection.setAutoCommit(true);
+      _connection.setAutoCommit(originalAutoCommit);
     }
   }
 

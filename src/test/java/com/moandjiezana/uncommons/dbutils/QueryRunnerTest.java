@@ -44,10 +44,8 @@ public class QueryRunnerTest {
   @Before
   public void before() throws Exception {
     queryRunner = QueryRunner.create(connection.get());
-    queryRunner.execute("CREATE SCHEMA unit_test");
-    queryRunner.execute("SET SCHEMA unit_test");
-    queryRunner.execute("CREATE TABLE tbl (id IDENTITY PRIMARY KEY, name VARCHAR(255), instant TIMESTAMP, active BOOLEAN, amount DECIMAL(5,2), num INT)");
-    queryRunner.execute("CREATE TABLE tbl_underscore (id_tbl BIGINT AUTO_INCREMENT PRIMARY KEY, name_of VARCHAR(255), instant_at TIMESTAMP, is_active BOOLEAN, amount_owed DECIMAL(5,2), num_owned INT)");
+    QueryRunner qr = queryRunner;
+    prepare(qr);
   }
 
   @Test
@@ -226,21 +224,20 @@ public class QueryRunnerTest {
   
   @Test
   public void should_not_save_if_auto_commit_is_off() throws Exception {
-    try (Connection c1 = DriverManager.getConnection("jdbc:h2:mem:test"); Connection c2 = DriverManager.getConnection("jdbc:h2:mem:test");) {
+    String url = "jdbc:h2:mem:no_save_if_auto_commit_is_off";
+    try (Connection c1 = DriverManager.getConnection(url); Connection c2 = DriverManager.getConnection(url);) {
       QueryRunner queryRunner = QueryRunner.create(c1);
-      queryRunner.execute("CREATE SCHEMA unit_test");
-      queryRunner.execute("SET SCHEMA unit_test");
-      queryRunner.execute("CREATE TABLE tbl (name VARCHAR(255))");
+      prepare(queryRunner);
 
       QueryRunner.create(c1).initializeWith(conn -> conn.setAutoCommit(false)).insert("INSERT INTO tbl(name) VALUES(?)", VOID, "abc");
       QueryRunner queryRunner2 = QueryRunner.create(c2);
-      Long count = queryRunner2.select("SELECT COUNT(name) FROM unit_test.tbl", single(firstColumn()));
-      assertEquals(0, count.intValue());
+      long count = queryRunner2.select("SELECT COUNT(name) FROM unit_test.tbl", single(firstColumn()));
+      assertEquals(0, count);
       
       c1.commit();
       
       count = queryRunner2.select("SELECT COUNT(name) FROM unit_test.tbl", single(firstColumn()));
-      assertEquals(1, count.intValue());
+      assertEquals(1, count);
     }
   }
   
@@ -256,6 +253,46 @@ public class QueryRunnerTest {
     String name = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(firstColumn()), 1L);
     
     assertEquals("b", name);
+  }
+  
+  @Test
+  public void should_implicitly_commit_transaction() throws Exception {
+    queryRunner.tx((qr, tx) -> {
+      qr.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "a");
+      tx.rollback();
+      qr.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "b");
+    });
+    
+    String name = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(firstColumn()), 1L);
+    
+    assertEquals("b", name);
+  }
+  
+  @Test
+  public void should_not_implicitly_commit_transaction_if_auto_commit_already_set_to_false() throws Exception {
+    String url = "jdbc:h2:mem:no_implicit_auto_commit";
+    try (Connection c1 = DriverManager.getConnection(url); Connection c2 = DriverManager.getConnection(url)) {
+      QueryRunner queryRunner1 = prepare(QueryRunner.create(c1));
+      queryRunner1.initializeWith(c -> c.setAutoCommit(false))
+        .tx((qr, tx) -> {
+          qr.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "a");
+        }
+      );
+      
+      QueryRunner queryRunner2 = QueryRunner.create(c2);
+      queryRunner2.execute("SET SCHEMA unit_test");
+      long count = queryRunner2.select("SELECT COUNT(id) FROM tbl WHERE id = ?", single(firstColumn()), 1L);
+      
+      assertEquals(0L, count);
+      
+      queryRunner1.tx((qr, tx) -> {
+        tx.commit();
+      });
+      
+      count = queryRunner2.select("SELECT COUNT(id) FROM tbl WHERE id = ?", single(firstColumn()), 1L);
+      assertEquals(1L, count);
+      assertFalse(c1.getAutoCommit());
+    }
   }
   
   @Test
@@ -320,5 +357,12 @@ public class QueryRunnerTest {
     }
   }
   
-  
+  private QueryRunner prepare(QueryRunner qr) throws Exception {
+    qr.execute("CREATE SCHEMA unit_test");
+    qr.execute("SET SCHEMA unit_test");
+    qr.execute("CREATE TABLE tbl (id IDENTITY PRIMARY KEY, name VARCHAR(255), instant TIMESTAMP, active BOOLEAN, amount DECIMAL(5,2), num INT)");
+    qr.execute("CREATE TABLE tbl_underscore (id_tbl BIGINT AUTO_INCREMENT PRIMARY KEY, name_of VARCHAR(255), instant_at TIMESTAMP, is_active BOOLEAN, amount_owed DECIMAL(5,2), num_owned INT)");
+    
+    return qr;
+  }
 }
