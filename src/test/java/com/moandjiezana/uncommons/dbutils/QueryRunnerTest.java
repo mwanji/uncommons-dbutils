@@ -94,14 +94,6 @@ public class QueryRunnerTest {
   }
   
   @Test
-  public void should_convert_boolean() throws Exception {
-    Long id = queryRunner.insert("INSERT INTO tbl(active) VALUES(?)", single(firstColumn()), true);
-    
-    Tbl tbl = queryRunner.select("SELECT active AS active2 FROM tbl WHERE id=?", single(tblRowProcessor), id);
-    
-  }
-  
-  @Test
   public void should_return_null_for_empty_result_set() throws Exception {
     Tbl tbl = queryRunner.select("SELECT * FROM tbl", single(tblRowProcessor));
     
@@ -188,22 +180,26 @@ public class QueryRunnerTest {
     assertEquals("b", tbls.get(2L).name);
   }
   
+  @SuppressWarnings("unchecked")
   @Test
   public void should_map_result_set_to_map_per_table_per_row() throws Exception {
     queryRunner.batch("INSERT INTO tbl(id, name) VALUES(?,?)", asList(asList(1L, "a"), asList(2L, "b")));
     queryRunner.batch("INSERT INTO tbl_underscore(id_tbl, name_of) VALUES(?,?)", asList(asList(1L, "a_"), asList(2L, "b_")));
     
-    List<Map<String, Map<String, Object>>> tbls = queryRunner.select("SELECT tbl.id, tbl.name, tbl_underscore.id_tbl, tbl_underscore.name_of FROM tbl INNER JOIN tbl_underscore ON tbl.id = tbl_underscore.id_tbl", list(rs -> {
-      Map<String, Map<String, Object>> row = new HashMap<>();
-      Map<String, MapRowProcessor> rowProcessors = new HashMap<>();
-      for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
-        String tableName = rs.getMetaData().getTableName(i).toLowerCase();
-        Map<String, Object> tableMap = row.computeIfAbsent(tableName, key -> new HashMap<String, Object>());
-        MapRowProcessor rowProcessor = rowProcessors.computeIfAbsent(tableName, key -> new MapRowProcessor(table(tableName)));
-        tableMap.putAll(rowProcessor.handle(rs)); 
-      }
-      return row;
-    }));
+    List<Map<String, Map<String, Object>>> tbls = queryRunner.select("SELECT tbl.id, tbl.name, tbl_underscore.id_tbl, tbl_underscore.name_of FROM tbl INNER JOIN tbl_underscore ON tbl.id = tbl_underscore.id_tbl",
+      list(rs -> {
+        Map<String, Map<String, Object>> row = new HashMap<>();
+        Map<String, MapRowProcessor> rowProcessors = new HashMap<>();
+        for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
+          String tableName = rs.getMetaData().getTableName(i).toLowerCase();
+          Map<String, Object> tableMap = row.computeIfAbsent(tableName, key -> new HashMap<String, Object>());
+          MapRowProcessor rowProcessor = rowProcessors.computeIfAbsent(tableName, key -> new MapRowProcessor(table(tableName)));
+          tableMap.putAll(rowProcessor.handle(rs)); 
+        }
+        
+        return row;
+      })
+    );
     
     HashMap<String, Object> tbl1 = new HashMap<>();
     tbl1.put("id", 1L);
@@ -302,6 +298,7 @@ public class QueryRunnerTest {
   private static class ValueOf {
     private String value;
     
+    @SuppressWarnings("unused")
     public static ValueOf valueOf(String value) {
       ValueOf valueOf = new ValueOf();
       valueOf.value = value;
