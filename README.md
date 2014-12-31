@@ -19,7 +19,6 @@ For Maven, add the following dependency:
   <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
-http://mwanji.github.io/uncommons-dbutils/dependency-info.html
 See [here](https://mwanji.github.io/uncommons-dbutils/dependency-info.html) for other dependency management systems.
 
 ## Examples
