@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 
+import javax.sql.DataSource;
+
 import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
 import com.moandjiezana.uncommons.dbutils.functions.ConsumerWithException;
 import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
@@ -68,6 +70,10 @@ public class QueryRunner {
    */
   public static QueryRunner create(Connection connection) {
     return new QueryRunner(() -> connection, c -> {});
+  }
+
+  public static QueryRunner create(DataSource dataSource) {
+    return new QueryRunner(() -> dataSource.getConnection(), c -> c.close());
   }
   
   public QueryRunner initializeWith(ConsumerWithException<Connection> initializer) {
