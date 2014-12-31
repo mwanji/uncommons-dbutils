@@ -18,7 +18,7 @@ For Maven, add the following dependency:
 </dependency>
 ```
 
-See [here](dependency-info.html) for instructions for other dependency management systems.
+See [instructions](dependency-info.html) for other dependency management systems.
 
 Examples
 ------
@@ -60,7 +60,17 @@ try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:")) {
 QueryRunner
 --------
 
-A [QueryRunner](apidocs/com/moandjiezana/uncommons/dbutils/QueryRunner.html) manages the database connection and executes queries. It can use either a `DataSource` or a `Connection`. When a `Connection` is used, it is up to you to close it.
+A [QueryRunner](apidocs/com/moandjiezana/uncommons/dbutils/QueryRunner.html) manages the database connection and executes queries. It can use either a `DataSource` or a `Connection`. When a `Connection` is used, it is up to you to close it. `Connection`s obtained from a `DataSource` are automatically closed.
+
+NOTE: `QueryRunner` is immutable.
+
+_Connection Initialization_
+
+```java
+QueryRunner serializableQueryRunner = QueryRunner.create(connection).withInitializer(c -> c.setTransactionIsolationLevel(Connection.TRANSACTION_SERIALIZABLE));
+```
+
+The block passed to `QueryRunner#withInitializer(Consumer<Connection>)` is run every time a new `Connection` is needed. In this example, every query executed via `serializableQueryRunner` will have the SERIALIZABLE transaction isolation level.
 
 ResultSetHandler
 ------------
@@ -77,3 +87,24 @@ RowProcessor
 ---------
 
 Converts a `ResultSet` row into something else.
+
+Transactions
+---------
+
+```java
+QueryRunner.create(connection).tx((qr, tx) -> {
+  try {
+    qr.insert(...);
+    qr.execute(...);
+    tx.commit();
+  } catch (Exception e) {
+    tx.rollback();
+  }
+});
+```
+
+Make sure to use the `QueryRunner` that is given to the transaction lambda, as it may not be the same instance as the one `tx` was called on.
+
+It is very important to call `QueryRunner.Transaction#commit()` or `QueryRunner.Transaction#rollback()` in the lambda. Failure to do so may have side-effects on subsequent queries.
+If the underlying `Connection` is set to auto-commit, then the transaction will be implicitly committed if you don't call `rollback()`.
+If auto-commit is turned off, when the `Connection` is reused, pending calls will be affected by the next commit or rollback.
