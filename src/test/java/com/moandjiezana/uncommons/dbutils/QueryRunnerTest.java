@@ -37,7 +37,7 @@ import com.moandjiezana.uncommons.dbutils.junit.TemporaryConnection;
 public class QueryRunnerTest {
 
   @Rule
-  public final TemporaryConnection connection = new TemporaryConnection("jdbc:h2:mem:;TRACE_LEVEL_SYSTEM_OUT=2");
+  public final TemporaryConnection connection = new TemporaryConnection("jdbc:h2:mem:");
   private QueryRunner queryRunner;
   private final ObjectRowProcessor<Tbl> tblRowProcessor = new ObjectRowProcessor<Tbl>(Tbl.class, ObjectRowProcessor.matching());
 
