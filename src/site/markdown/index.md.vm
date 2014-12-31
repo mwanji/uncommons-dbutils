@@ -23,7 +23,7 @@ See [here](dependency-info.html) for instructions for other dependency managemen
 Examples
 ------
 
-<pre><code>
+```java
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.list;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.map;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.single;
@@ -42,20 +42,20 @@ try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:")) {
   String name = queryRunner.select("SELECT name FROM persons WHERE id = ?", single(firstColumn()), 1L);
   
   // Get a single column from a query that returns multiple rows
-  List&lt;String&gt; names = queryRunner.select("SELECT name FROM persons", list(firstColumn()), 1L);
+  List<String> names = queryRunner.select("SELECT name FROM persons", list(firstColumn()), 1L);
   
   // Create a Map containing all the single-row query's columns, i.e. { "id": 1, "name": "John" }
-  Map&lt;String, Object&gt; person = queryRunner.select("SELECT * FROM persons WHERE id = ?", single(new MapRowProcessor(), 1L);
+  Map<String, Object> person = queryRunner.select("SELECT * FROM persons WHERE id = ?", single(new MapRowProcessor(), 1L);
   
   // Create a custom Person object for each row returned by the query
   // Note that the ObjectRowProcessor, like most uncommons-dbutils classes, can be reused across queries, QueryRunners and threads
-  ObjectRowProcessor&lt;Person&gt; personRowProcessor = new ObjectRowProcessor&lt;Person&gt;(Person.class, ObjectRowProcessor.matching());
-  List&lt;Person&gt; persons = queryRunner.select("SELECT * FROM persons", list(personRowProcessor));
+  ObjectRowProcessor<Person> personRowProcessor = new ObjectRowProcessor<Person>(Person.class, ObjectRowProcessor.matching());
+  List<Person> persons = queryRunner.select("SELECT * FROM persons", list(personRowProcessor));
   
   // Create a Map of primary keys to Person objects, i.e. { 1: Person(...), 2: Person(...) }
-  Map&lt;Long, Person personsMap = queryRunner.select("SELECT * FROM persons", ResultSetHandler.map("id", Long.class, personRowProcessor));
+  Map<Long, Person personsMap = queryRunner.select("SELECT * FROM persons", ResultSetHandler.map("id", Long.class, personRowProcessor));
 }
-</code></pre>
+```
 
 QueryRunner
 --------
