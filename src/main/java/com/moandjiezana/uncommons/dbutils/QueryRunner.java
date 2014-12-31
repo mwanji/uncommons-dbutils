@@ -110,7 +110,7 @@ public class QueryRunner {
    */
   public int execute(String sql, Object... params) throws Exception {
     return run(c -> {
-      try (PreparedStatement statement = connection.get().prepareStatement(sql);) {
+      try (PreparedStatement statement = c.prepareStatement(sql);) {
         fillStatement(statement, Arrays.asList(params));
 
         return statement.executeUpdate();
@@ -133,7 +133,7 @@ public class QueryRunner {
    */
   public <T> T insert(String sql, ResultSetHandler<T> resultSetHandler, Object... params) throws Exception {
     return run(c -> {
-    try (PreparedStatement stmt = connection.get().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
+    try (PreparedStatement stmt = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
       fillStatement(stmt, Arrays.asList(params));
       stmt.executeUpdate();
       
@@ -155,7 +155,7 @@ public class QueryRunner {
    */
   public int[] batch(String sql, List<List<Object>> params) throws Exception {
     return run(c -> {
-      try (PreparedStatement statement = connection.get().prepareStatement(sql);) {
+      try (PreparedStatement statement = c.prepareStatement(sql);) {
         for (int i = 0; i < params.size(); i++) {
           this.fillStatement(statement, params.get(i));
           statement.addBatch();
@@ -181,7 +181,7 @@ public class QueryRunner {
    */
   public <T> T batchInsert(String sql, ResultSetHandler<T> resultSetHandler, List<List<Object>> batchParams) throws Exception {
     return run(c -> {
-      try (PreparedStatement stmt = connection.get().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
+      try (PreparedStatement stmt = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
         for (List<Object> params : batchParams) {
           this.fillStatement(stmt, params);
           stmt.addBatch();
