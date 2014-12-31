@@ -19,7 +19,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
-import java.util.Arrays;
 import java.util.List;
 
 import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
@@ -74,6 +73,33 @@ public class QueryRunner {
   }
   
   /**
+   * <p>
+   * SQL NOTE:<br/>
+   * If you wish to use possibly <code>null</code> values in a WHERE clause's params, do not use "= ?", as in SQL <code>NULL = NULL</code> and <code>NULL <> NULL</code> will not return <code>true</code>.
+   * Use <code>IS DISTINCT FROM ?</code> or <code>IS NOT DISTINCT FROM ?</code> instead.
+   * </p>
+   * 
+   * <p>
+   * Known to be supported in:
+   * <ul>
+   *  <li><a href="https://wiki.postgresql.org/wiki/Is_distinct_from">PostgreSQL</a></li>
+   *  <li><a href="http://h2database.com/html/grammar.html#condition_right_hand_side">H2</a> (also aliased to <code>IS [NOT] ?</code>)</li>
+   * </ul>
+   * </p>
+   * 
+   * <p>
+   * Alternatives:
+   * <ul>
+   *  <li><a href="http://dev.mysql.com/doc/refman/5.6/en/comparison-operators.html#operator_equal-to">MySQL</a> uses <code>&lt;=&gt;</code></li>
+   *  <li><a href="https://mariadb.com/kb/en/mariadb/documentation/functions-and-operators/operators/comparison-operators/null-safe-equal/">MariaDB</a> uses <code>&lt;=&gt;</code></li>
+   *  <li><a href="http://www.sqlite.org/lang_expr.html#binaryops">SQLite</a> uses <code>IS [NOT] ?</code></li>
+   * </ul>
+   * </p>
+   * 
+   * <p>
+   * See <a href="http://blog.jooq.org/2012/09/21/the-is-distinct-from-predicate/">http://blog.jooq.org/2012/09/21/the-is-distinct-from-predicate/</a> for more info.
+   * </p>
+   * 
    * @param sql
    *    the SELECT to execute
    * @param resultSetHandler
@@ -89,7 +115,7 @@ public class QueryRunner {
  public <T> T select(String sql, ResultSetHandler<T> resultSetHandler, Object... params) throws Exception {
     return run(c -> {
       try (PreparedStatement stmt = c.prepareStatement(sql);) {
-        fillStatement(stmt, Arrays.asList(params));
+        fillStatementParam(stmt, params);
         
         try (ResultSet rs = stmt.executeQuery();) {
           return resultSetHandler.handle(rs);
@@ -99,6 +125,8 @@ public class QueryRunner {
   }
 
   /**
+   * <p>SQL NOTE: if you wish to use possibly <code>null</code> values, please see the discussion in {@link #select(String, ResultSetHandler, Object...)}</p>
+   * 
    * @param sql
    *    the UPDATE, DELETE or DDL to execute. Ignores any values returned by the {@link ResultSet}.
    * @param params
@@ -111,7 +139,7 @@ public class QueryRunner {
   public int execute(String sql, Object... params) throws Exception {
     return run(c -> {
       try (PreparedStatement statement = c.prepareStatement(sql);) {
-        fillStatement(statement, Arrays.asList(params));
+        fillStatementParam(statement, params);
 
         return statement.executeUpdate();
       }
@@ -134,7 +162,7 @@ public class QueryRunner {
   public <T> T insert(String sql, ResultSetHandler<T> resultSetHandler, Object... params) throws Exception {
     return run(c -> {
     try (PreparedStatement stmt = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
-      fillStatement(stmt, Arrays.asList(params));
+      fillStatementParam(stmt, params);
       stmt.executeUpdate();
       
       try (ResultSet resultSet = stmt.getGeneratedKeys();) {
@@ -157,7 +185,7 @@ public class QueryRunner {
     return run(c -> {
       try (PreparedStatement statement = c.prepareStatement(sql);) {
         for (int i = 0; i < params.size(); i++) {
-          this.fillStatement(statement, params.get(i));
+          this.fillStatementParams(statement, params.get(i));
           statement.addBatch();
         }
 
@@ -183,7 +211,7 @@ public class QueryRunner {
     return run(c -> {
       try (PreparedStatement stmt = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
         for (List<Object> params : batchParams) {
-          this.fillStatement(stmt, params);
+          this.fillStatementParams(stmt, params);
           stmt.addBatch();
         }
         stmt.executeBatch();
@@ -224,33 +252,34 @@ public class QueryRunner {
     this.finalizer = finalizer;
   }
 
-  /*
-   * Fill the <code>PreparedStatement</code> replacement parameters with the
-   * given objects.
-   * 
-   * @param stmt PreparedStatement to fill
-   * 
-   * @param params Query replacement parameters; <code>null</code> is a valid
-   * value to pass in.
-   * 
-   * @throws SQLException if a database access error occurs
-   */
-  private void fillStatement(PreparedStatement statement, List<Object> params) throws SQLException {
+  private void fillStatementParams(PreparedStatement statement, List<Object> params) throws SQLException {
     for (int i = 0; i < params.size(); i++) {
       Object param = params.get(i);
-      if (param != null) {
-        statement.setObject(i + 1, param);
-      } else {
-        // VARCHAR works with many drivers regardless
-        // of the actual column type. Oddly, NULL and
-        // OTHER don't work with Oracle's drivers.
-        int sqlType = Types.VARCHAR;
-        sqlType = statement.getParameterMetaData().getParameterType(i + 1);
-        statement.setNull(i + 1, sqlType);
-      }
+      int jdbcIndex = i + 1;
+      fillStatementParam(statement, param, jdbcIndex);
     }
   }
   
+  private void fillStatementParam(PreparedStatement statement, Object[] params) throws SQLException {
+    for (int i = 0; i < params.length; i++) {
+      Object param = params[i];
+      int jdbcIndex = i + 1;
+      fillStatementParam(statement, param, jdbcIndex);
+    }
+  }
+
+  private void fillStatementParam(PreparedStatement statement, Object param, int jdbcIndex) throws SQLException {
+    if (param != null) {
+      statement.setObject(jdbcIndex, param);
+    } else {
+      // VARCHAR works with many drivers regardless
+      // of the actual column type. Oddly, NULL and
+      // OTHER don't work with Oracle's drivers.
+      int sqlType = Types.VARCHAR;
+      sqlType = statement.getParameterMetaData().getParameterType(jdbcIndex);
+      statement.setNull(jdbcIndex, sqlType);
+    }
+  }
   
   private <T> T run(FunctionWithException<Connection, T> consumer) throws Exception {
     Connection c = connection.get();
