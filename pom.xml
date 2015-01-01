@@ -192,4 +192,11 @@
     <system>Travis CI</system>
     <url>https://travis-ci.org/mwanji/uncommons-dbutils</url>
   </ciManagement>
+  <distributionManagement>
+    <repository>
+      <id>bintray-mwanji-maven-uncommons-dbutils</id>
+      <name>mwanji-maven-uncommons-dbutils</name>
+      <url>https://api.bintray.com/maven/mwanji/maven/uncommons-dbutils</url>
+    </repository>
+  </distributionManagement>
 </project>
