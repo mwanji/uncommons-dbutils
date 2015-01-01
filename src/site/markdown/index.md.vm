@@ -64,13 +64,15 @@ A [QueryRunner](apidocs/com/moandjiezana/uncommons/dbutils/QueryRunner.html) man
 
 NOTE: `QueryRunner` is immutable.
 
-_Connection Initialization_
+**Connection Initialization**
 
 ```java
 QueryRunner serializableQueryRunner = QueryRunner.create(connection).withInitializer(c -> c.setTransactionIsolationLevel(Connection.TRANSACTION_SERIALIZABLE));
 ```
 
+#[[
 The block passed to `QueryRunner#withInitializer(Consumer<Connection>)` is run every time a new `Connection` is needed. In this example, every query executed via `serializableQueryRunner` will have the SERIALIZABLE transaction isolation level.
+]]#
 
 ResultSetHandler
 ------------
