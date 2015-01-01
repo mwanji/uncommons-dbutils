@@ -6,6 +6,14 @@ Full documentation is at https://mwanji.github.io/uncommons-dbutils
 
 [![Build Status](https://img.shields.io/travis/mwanji/uncommons-dbutils.svg)](https://travis-ci.org/mwanji/uncommons-dbutils) [![Coverage Status](https://img.shields.io/coveralls/mwanji/uncommons-dbutils.svg)](https://coveralls.io/r/mwanji/uncommons-dbutils?branch=master) [![License](https://img.shields.io/badge/license-Apache%20v2.0-lightgrey.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
+## Features
+
+* Transaction support
+* Asynchronous querying via [CompletableFuture](http://www.nurkiewicz.com/2013/05/java-8-definitive-guide-to.html)
+* Lightweight: only executes queries and maps `ResultSet`s to objects
+* A small number of easily-composible interfaces
+* Takes advantage of Java 8 lambdas for concise code
+
 ## Installation
 
 Requires Java 8.
