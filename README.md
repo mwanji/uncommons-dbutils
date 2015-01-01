@@ -4,7 +4,7 @@ A modernised fork of [Apache Commons DBUtils](http://commons.apache.org/proper/c
 
 Full documentation is at https://mwanji.github.io/uncommons-dbutils
 
-[![Build Status](https://img.shields.io/travis/mwanji/uncommons-dbutils.svg)](https://travis-ci.org/mwanji/uncommons-dbutils) [![Coverage Status](https://img.shields.io/coveralls/mwanji/uncommons-dbutils.svg)](https://coveralls.io/r/mwanji/uncommons-dbutils?branch=master)
+[![Build Status](https://img.shields.io/travis/mwanji/uncommons-dbutils.svg)](https://travis-ci.org/mwanji/uncommons-dbutils) [![Coverage Status](https://img.shields.io/coveralls/mwanji/uncommons-dbutils.svg)](https://coveralls.io/r/mwanji/uncommons-dbutils?branch=master) [![License](https://img.shields.io/badge/license-Apache%20v2.0-lightgrey.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
 ## Installation
 
