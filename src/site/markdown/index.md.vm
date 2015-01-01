@@ -1,3 +1,5 @@
+#set( $doclink = "apidocs/com/moandjiezana/uncommons/dbutils" )
+
 uncommons-dbutils
 =============
 
@@ -60,7 +62,7 @@ try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:")) {
 QueryRunner
 --------
 
-A [QueryRunner](apidocs/com/moandjiezana/uncommons/dbutils/QueryRunner.html) manages the database connection and executes queries. It can use either a `DataSource` or a `Connection`. When a `Connection` is used, it is up to you to close it. `Connection`s obtained from a `DataSource` are automatically closed.
+A [QueryRunner]($doclink/QueryRunner.html) manages the database connection and executes queries. It can use either a `DataSource` or a `Connection`. When a `Connection` is used, it is up to you to close it. `Connection`s obtained from a `DataSource` are automatically closed.
 
 NOTE: `QueryRunner` is immutable.
 
@@ -107,7 +109,7 @@ QueryRunner.create(connection).tx((qr, tx) -> {
 
 Make sure to use the `QueryRunner` that is given to the transaction lambda, as it may not be the same instance as the one `tx` was called on.
 
-It is very important to call `QueryRunner.Transaction#commit()` or `QueryRunner.Transaction#rollback()` in the lambda. Failure to do so may have side-effects on subsequent queries.
+It is very important to call [QueryRunner.Transaction#commit()]($doclink/QueryRunner.Transaction.html#commit--) or [QueryRunner.Transaction#rollback()]($doclink/QueryRunner.Transaction.html#rollback--) in the lambda. Failure to do so may have side-effects on subsequent queries.
 If the underlying `Connection` is set to auto-commit, then the transaction will be implicitly committed if you don't call `rollback()`.
 If auto-commit is turned off, when the `Connection` is reused, pending calls will be affected by the next commit or rollback.
 
