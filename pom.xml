@@ -188,4 +188,8 @@
     <connection>scm:git:git://github.com/mwanji/uncommons-dbutils.git</connection>
     <developerConnection>scm:git:git://github.com/mwanji/uncommons-dbutils.git</developerConnection>
   </scm>
+  <ciManagement>
+    <system>Travis CI</system>
+    <url>https://travis-ci.org/mwanji/uncommons-dbutils</url>
+  </ciManagement>
 </project>
