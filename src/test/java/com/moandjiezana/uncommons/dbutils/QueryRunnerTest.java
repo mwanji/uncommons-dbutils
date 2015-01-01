@@ -308,7 +308,7 @@ public class QueryRunnerTest {
   public void should_set_object_field_to_null_if_not_found_in_result_set() throws Exception {
     queryRunner.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "a");
     
-    ValueOf valueOf = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ObjectRowProcessor<ValueOf>(ValueOf.class, (cl, col) -> { return null; })), 1L);
+    ValueOf valueOf = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ObjectRowProcessor<ValueOf>(ValueOf.class, (rs, i, o) -> { return Optional.empty(); })), 1L);
     
     assertNull(valueOf.value);
   }

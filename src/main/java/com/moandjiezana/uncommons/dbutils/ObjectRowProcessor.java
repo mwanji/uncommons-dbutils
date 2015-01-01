@@ -1,25 +1,31 @@
 package com.moandjiezana.uncommons.dbutils;
 
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.sql.ResultSet;
-import java.util.function.Predicate;
-
-import com.moandjiezana.uncommons.dbutils.functions.BiFunctionWithException;
+import java.util.Optional;
 
 public class ObjectRowProcessor<T> implements RowProcessor<T> {
   
-  public static Predicate<String> table(String tableName) {
-    return t -> t.equalsIgnoreCase(tableName);
+  public static final <U> ColumnMapper<U> matching() {
+    return (rs, i, instance) -> {
+      String columnLabel = rs.getMetaData().getColumnLabel(i);
+      for (Field field : instance.getClass().getDeclaredFields()) {
+        if (field.getName().equalsIgnoreCase(columnLabel)) {
+          return Optional.of(field);
+        }
+      }
+      
+      return Optional.empty();
+    };
   }
   
-  public static final <U> BiFunctionWithException<Class<U>, String, Field> matching() {
-    return (cl, col) -> cl.getDeclaredField(col);
-  }
-  
-  public static final <U> BiFunctionWithException<Class<U>, String, Field> underscoresToCamel() {
-    return (cl, col) -> {
+  public static final <U> ColumnMapper<U> underscoresToCamel() {
+    return (rs, columnIndex, instance) -> {
       StringBuilder sb = new StringBuilder();
+      String col = rs.getMetaData().getColumnLabel(columnIndex);
       for (int i = 0; i < col.length(); i++) {
         char ch = col.charAt(i);
         if (ch == '_') {
@@ -30,23 +36,25 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
         }
       }
       
-      return cl.getDeclaredField(sb.toString());
+      col = sb.toString();
+      
+      for (Field field : instance.getClass().getDeclaredFields()) {
+        if (field.getName().equalsIgnoreCase(col)) {
+          return Optional.of(field);
+        }
+      }
+      
+      return Optional.empty();
     };
   }
   
   private final Class<T> objectClass;
-  private final BiFunctionWithException<Class<T>, String, Field> columnToFieldMapper;
+  private final ColumnMapper<T> columnMapper;
   private final Converters converters = Converters.INSTANCE;
-  private final Predicate<String> tablePredicate;
   
-  public ObjectRowProcessor(Class<T> objectClass, BiFunctionWithException<Class<T>, String, Field> columnToFieldMapper) {
-    this(objectClass, t -> true, columnToFieldMapper);
-  }
-
-  public ObjectRowProcessor(Class<T> objectClass, Predicate<String> tablePredicate, BiFunctionWithException<Class<T>, String, Field> columnToFieldMapper) {
+  public ObjectRowProcessor(Class<T> objectClass, ColumnMapper<T> columnMapper) {
     this.objectClass = objectClass;
-    this.tablePredicate = tablePredicate;
-    this.columnToFieldMapper = columnToFieldMapper;
+    this.columnMapper = columnMapper;
   }
 
   @Override
@@ -54,26 +62,54 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
     Constructor<T> constructor = objectClass.getDeclaredConstructor();
     constructor.setAccessible(true);
     T instance = constructor.newInstance();
-      for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
-        String jdbcTableName = rs.getMetaData().getTableName(i).toLowerCase();
-        if (tablePredicate.test(jdbcTableName)) {
-          String columnLabel = rs.getMetaData().getColumnLabel(i).toLowerCase();
-          Field field = columnToFieldMapper.apply(objectClass, columnLabel);
-          if (field == null) {
-            continue;
-          }
-          field.setAccessible(true);
-          if (field.getType() == boolean.class) {
-            field.set(instance, rs.getBoolean(i));
-          } else if (field.getType() == int.class) {
-            field.set(instance, rs.getInt(i));
-          } else {
-            field.set(instance, converters.convert(field.getType(), rs.getObject(i)));
-          }
-        }
-        
+    for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
+      Optional<AccessibleObject> optional = columnMapper.apply(rs, i, instance);
+      if (!optional.isPresent()) {
+        continue;
+      }
+      
+      Accessor field = new Accessor(optional.get());
+      if (field.getType() == boolean.class) {
+        field.set(instance, rs.getBoolean(i));
+      } else if (field.getType() == int.class) {
+        field.set(instance, rs.getInt(i));
+      } else {
+        field.set(instance, converters.convert(field.getType(), rs.getObject(i)));
+      }
     };
     
     return instance;
+  }
+  
+  @FunctionalInterface
+  private static interface ColumnMapper<T> {
+    public Optional<AccessibleObject> apply(ResultSet rs, int columnIndex, T instance) throws Exception;
+  }
+  
+  private static class Accessor {
+    final Field field;
+    final Method method;
+    
+    Accessor(AccessibleObject accessibleObject) {
+      this.field = accessibleObject instanceof Field ? (Field) accessibleObject : null;
+      this.method = accessibleObject instanceof Method ? (Method) accessibleObject : null;
+      accessibleObject.setAccessible(true);
+    }
+    
+    Class<?> getType() {
+      return field != null ? field.getType() : method.getParameterTypes()[0];
+    }
+    
+    void set(Object instance, Object value) {
+      try {
+        if (field != null) {
+          field.set(instance, value);
+        } else {
+          method.invoke(instance, value);
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 }
