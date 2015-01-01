@@ -19,11 +19,17 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
+import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
 import com.moandjiezana.uncommons.dbutils.functions.ConsumerWithException;
@@ -40,10 +46,12 @@ public class QueryRunner {
   
   public static class Transaction {
     public void commit() throws SQLException {
+      LOG.debug("Transaction: COMMIT");
       connection.commit();
     }
     
     public void rollback() throws SQLException {
+      LOG.debug("Transaction: ROLLBACK");
       connection.rollback();
     }
     
@@ -54,6 +62,8 @@ public class QueryRunner {
     }
   }
 
+  private static final Logger LOG = LoggerFactory.getLogger(QueryRunner.class);
+  
   private final SupplierWithException<Connection> connection;
   private final ConsumerWithException<Connection> finalizer;
 
@@ -69,6 +79,14 @@ public class QueryRunner {
    * @return a {@link Connection}-based QueryRunner
    */
   public static QueryRunner create(Connection connection) {
+    if (LOG.isTraceEnabled()) {
+      try {
+        LOG.trace("QueryRunner connected to", connection.getMetaData().getURL());
+      } catch (SQLException e) {
+        LOG.error("Could not log start-up message: {}", e.getMessage());
+      }
+    }
+    
     return new QueryRunner(() -> connection, c -> {});
   }
 
@@ -130,6 +148,7 @@ public class QueryRunner {
    */
  public <T> T select(String sql, ResultSetHandler<T> resultSetHandler, Object... params) throws Exception {
     return run(c -> {
+      log(sql, params);
       try (PreparedStatement stmt = c.prepareStatement(sql);) {
         fillStatementParam(stmt, params);
         
@@ -154,6 +173,7 @@ public class QueryRunner {
    */
   public int execute(String sql, Object... params) throws Exception {
     return run(c -> {
+      log(sql, params);
       try (PreparedStatement statement = c.prepareStatement(sql);) {
         fillStatementParam(statement, params);
 
@@ -177,31 +197,36 @@ public class QueryRunner {
    */
   public <T> T insert(String sql, ResultSetHandler<T> resultSetHandler, Object... params) throws Exception {
     return run(c -> {
-    try (PreparedStatement stmt = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
-      fillStatementParam(stmt, params);
-      stmt.executeUpdate();
-      
-      try (ResultSet resultSet = stmt.getGeneratedKeys();) {
-        return resultSetHandler.handle(resultSet);
+      log(sql, params);
+      try (PreparedStatement stmt = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
+        fillStatementParam(stmt, params);
+
+        stmt.executeUpdate();
+
+        try (ResultSet resultSet = stmt.getGeneratedKeys();) {
+          return resultSetHandler.handle(resultSet);
+        }
       }
-    }
     });
   }
 
   /**
    * @param sql
    *    the SQL to execute
-   * @param params
+   * @param batchParams
    *    values for the SQL placeholders. Eg. <code>Arrays.asList(Arrays.asList(1L), Arrays.asList(2L))</code> will create a batch of 2 queries, using 1, then 2, as values.
    * @return the number of affected rows for each time the SQL was executed
    * @throws Exception
    *    if anything goes wrong
    */
-  public int[] batch(String sql, List<List<Object>> params) throws Exception {
+  public int[] batch(String sql, List<List<Object>> batchParams) throws Exception {
     return run(c -> {
       try (PreparedStatement statement = c.prepareStatement(sql);) {
-        for (int i = 0; i < params.size(); i++) {
-          this.fillStatementParams(statement, params.get(i));
+        for (List<Object> params : batchParams) {
+          if (LOG.isDebugEnabled()) {
+            log(sql, params.toArray());
+          }
+          this.fillStatementParams(statement, params);
           statement.addBatch();
         }
 
@@ -227,6 +252,9 @@ public class QueryRunner {
     return run(c -> {
       try (PreparedStatement stmt = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
         for (List<Object> params : batchParams) {
+          if (LOG.isDebugEnabled()) {
+            log(sql, params.toArray());
+          }
           this.fillStatementParams(stmt, params);
           stmt.addBatch();
         }
@@ -261,10 +289,12 @@ public class QueryRunner {
     _connection.setAutoCommit(false);
     QueryRunner queryRunner = new QueryRunner(() -> _connection, c -> {});
     try {
+      LOG.debug("Transaction: START");
       txQueryRunner.accept(queryRunner, new QueryRunner.Transaction(_connection));
     } finally {
       finalizer.accept(_connection);
       _connection.setAutoCommit(originalAutoCommit);
+      LOG.debug("Transaction: END");
     }
   }
 
@@ -308,6 +338,18 @@ public class QueryRunner {
       return consumer.apply(c);
     } finally {
       finalizer.accept(c);
+    }
+  }
+
+  private void log(String sql, Object... params) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("QUERY: {}; VALUES: {};", sql, Arrays.stream(params).map(o -> {
+        if (o instanceof String) {
+          return "'" + o + "'";
+        }
+        
+        return Objects.toString(o);
+      }).collect(Collectors.joining(", ", "[", "]")));
     }
   }
 }

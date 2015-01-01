@@ -10,8 +10,9 @@ Full documentation is at https://mwanji.github.io/uncommons-dbutils
 
 * Transaction support
 * Asynchronous querying via [CompletableFuture](http://www.nurkiewicz.com/2013/05/java-8-definitive-guide-to.html)
-* Lightweight: only executes queries and maps `ResultSet`s to objects
-* A small number of easily-composible interfaces
+* Lightweight: executes queries and maps `ResultSet`s to objects. That's all.
+* Basic debug logging with [SLF4J](http://www.slf4j.org)
+* A small number of easily-composable interfaces
 * Takes advantage of Java 8 lambdas for concise code
 
 ## Installation

@@ -110,3 +110,19 @@ Make sure to use the `QueryRunner` that is given to the transaction lambda, as i
 It is very important to call `QueryRunner.Transaction#commit()` or `QueryRunner.Transaction#rollback()` in the lambda. Failure to do so may have side-effects on subsequent queries.
 If the underlying `Connection` is set to auto-commit, then the transaction will be implicitly committed if you don't call `rollback()`.
 If auto-commit is turned off, when the `Connection` is reused, pending calls will be affected by the next commit or rollback.
+
+Logging
+-----
+
+uncommons-dbutils uses [SLF4J](http://www.slf4j.org)'s API so you can use your favourite logging library.
+
+To log queries (along with the placeholder values) and transaction events, set `com.moandjiezana.uncommons.dbutils.QueryRunner` logging level to debug. Set the log level to trace to also log `QueryRunner` creation.
+
+See the appropriate configuration instructions:
+
+* [slf4j-simple](http://www.slf4j.org/api/org/slf4j/impl/SimpleLogger.html)
+* [Logback](http://logback.qos.ch/manual/configuration.html)
+* [avsl](http://software.clapper.org/avsl/users-guide.html#the-avsl-configuration-file-in-depth)
+* [log4j](http://logging.apache.org/log4j/1.2/manual.html)
+* [log4j 2.0](http://logging.apache.org/log4j/2.0/manual/configuration.html)
+* [java.util.logging](http://tutorials.jenkov.com/java-logging/configuration.html)
