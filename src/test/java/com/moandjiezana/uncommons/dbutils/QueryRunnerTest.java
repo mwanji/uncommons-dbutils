@@ -17,6 +17,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
+import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -32,6 +33,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import com.moandjiezana.uncommons.dbutils.functions.SupplierWithException;
 import com.moandjiezana.uncommons.dbutils.junit.TemporaryConnection;
 
 public class QueryRunnerTest {
@@ -39,7 +41,7 @@ public class QueryRunnerTest {
   @Rule
   public final TemporaryConnection connection = new TemporaryConnection("jdbc:h2:mem:");
   private QueryRunner queryRunner;
-  private final ObjectRowProcessor<Tbl> tblRowProcessor = new ObjectRowProcessor<Tbl>(Tbl.class, ObjectRowProcessor.matching());
+  private final ObjectRowProcessor<Tbl> tblRowProcessor = new ObjectRowProcessor<Tbl>(privateConstructor(Tbl.class), ObjectRowProcessor.matching());
 
   @Before
   public void before() throws Exception {
@@ -123,7 +125,7 @@ public class QueryRunnerTest {
     Instant now = Instant.now();
     Long id = queryRunner.insert("INSERT INTO tbl_underscore(name_of, instant_at, is_active, amount_owed, num_owned) VALUES(?,?,?,?,?)", single(firstColumn()), "abc1", Timestamp.from(now), true, BigDecimal.valueOf(1.13), 5);
     
-    TblUnderscore tbl = queryRunner.select("SELECT * FROM tbl_underscore WHERE id_tbl=?", single(new ObjectRowProcessor<TblUnderscore>(TblUnderscore.class, ObjectRowProcessor.underscoresToCamel())), id);
+    TblUnderscore tbl = queryRunner.select("SELECT * FROM tbl_underscore WHERE id_tbl=?", single(new ObjectRowProcessor<TblUnderscore>(privateConstructor(TblUnderscore.class), ObjectRowProcessor.underscoresToCamel())), id);
     
     assertEquals(1L, tbl.idTbl.longValue());
     assertEquals("abc1", tbl.nameOf);
@@ -308,7 +310,7 @@ public class QueryRunnerTest {
   public void should_set_object_field_to_null_if_not_found_in_result_set() throws Exception {
     queryRunner.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "a");
     
-    ValueOf valueOf = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ObjectRowProcessor<ValueOf>(ValueOf.class, (rs, i, o) -> { return Optional.empty(); })), 1L);
+    ValueOf valueOf = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ObjectRowProcessor<ValueOf>(privateConstructor(ValueOf.class), (rs, i, o) -> { return Optional.empty(); })), 1L);
     
     assertNull(valueOf.value);
   }
@@ -364,5 +366,14 @@ public class QueryRunnerTest {
     qr.execute("CREATE TABLE tbl_underscore (id_tbl BIGINT AUTO_INCREMENT PRIMARY KEY, name_of VARCHAR(255), instant_at TIMESTAMP, is_active BOOLEAN, amount_owed DECIMAL(5,2), num_owned INT)");
     
     return qr;
+  }
+  
+  private static <T> SupplierWithException<T> privateConstructor(Class<T> objectClass) {
+    return () -> {
+      Constructor<T> c = objectClass.getDeclaredConstructor();
+      c.setAccessible(true);
+      
+      return c.newInstance();
+    };
   }
 }

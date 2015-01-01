@@ -1,11 +1,12 @@
 package com.moandjiezana.uncommons.dbutils;
 
 import java.lang.reflect.AccessibleObject;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.ResultSet;
 import java.util.Optional;
+
+import com.moandjiezana.uncommons.dbutils.functions.SupplierWithException;
 
 public class ObjectRowProcessor<T> implements RowProcessor<T> {
   
@@ -48,20 +49,24 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
     };
   }
   
-  private final Class<T> objectClass;
+  public static final <U> SupplierWithException<U> beanCreator(Class<U> beanClass) {
+    return () -> {
+      return beanClass.getConstructor().newInstance();
+    };
+  }
+  
+  private final SupplierWithException<T> instanceCreator;
   private final ColumnMapper<T> columnMapper;
   private final Converters converters = Converters.INSTANCE;
   
-  public ObjectRowProcessor(Class<T> objectClass, ColumnMapper<T> columnMapper) {
-    this.objectClass = objectClass;
+  public ObjectRowProcessor(SupplierWithException<T> instanceCreator, ColumnMapper<T> columnMapper) {
+    this.instanceCreator = instanceCreator;
     this.columnMapper = columnMapper;
   }
 
   @Override
   public T handle(ResultSet rs) throws Exception {
-    Constructor<T> constructor = objectClass.getDeclaredConstructor();
-    constructor.setAccessible(true);
-    T instance = constructor.newInstance();
+    T instance = instanceCreator.get();
     for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
       Optional<AccessibleObject> optional = columnMapper.apply(rs, i, instance);
       if (!optional.isPresent()) {
