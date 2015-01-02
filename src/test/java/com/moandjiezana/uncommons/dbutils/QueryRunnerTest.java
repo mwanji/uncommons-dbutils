@@ -10,8 +10,8 @@ import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.list;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.map;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.optional;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.single;
+import static com.moandjiezana.uncommons.dbutils.RowProcessor.beanProcessor;
 import static com.moandjiezana.uncommons.dbutils.RowProcessor.firstColumn;
-import static com.moandjiezana.uncommons.dbutils.RowProcessor.mapToBean;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -61,6 +61,18 @@ public class QueryRunnerTest {
     String name = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(firstColumn()), id);
 
     assertEquals("abc1", name);
+  }
+
+  @Test
+  public void should_get_single_column_by_name() throws Exception {
+    Instant now = Instant.now();
+    Long id = queryRunner.insert("INSERT INTO tbl(name, instant) VALUES(?,?)", single(firstColumn()), "abc1", Timestamp.from(now));
+    
+    String name = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ColumnRowProcessor<String>("name")), id);
+    Instant instant = queryRunner.select("SELECT instant FROM tbl WHERE id = ?", single(new ColumnRowProcessor<Instant>("instant", Instant.class)), id);
+
+    assertEquals("abc1", name);
+    assertEquals(now, instant);
   }
 
   @Test
@@ -339,7 +351,7 @@ public class QueryRunnerTest {
     queryRunner.batch("INSERT INTO tbl(name) VALUES(?)", asList(asList("a"), asList("b")));
     queryRunner.batch("INSERT INTO tbl_underscore(name_of) VALUES(?)", asList(asList("a_"), asList("b_")));
     
-    RowProcessor<Tbl> tblTableProcessor = RowProcessor.mapToFields(Tbl.class);
+    RowProcessor<Tbl> tblTableProcessor = RowProcessor.fieldsProcessor(Tbl.class);
     RowProcessor<TblUnderscore> tblUnderscoreTableProcessor = new ObjectRowProcessor<TblUnderscore>(noArgsCreator(TblUnderscore.class), table("tbl_underscore", underscoresToCamel()));
     BiConsumerWithException<Joined, Object> strategy = (joining, o) -> {
       if (o instanceof Tbl) {
@@ -360,7 +372,7 @@ public class QueryRunnerTest {
     Instant now = Instant.now();
     queryRunner.execute("INSERT INTO tbl(id, name, instant, active, amount, num) VALUES(?,?,?,?,?,?)", 1L, "a", Timestamp.from(now), false, BigDecimal.ONE, 2);
     
-    TblBean tblBean = queryRunner.select("SELECT * FROM tbl WHERE id = ?", single(mapToBean(TblBean.class)), 1L);
+    TblBean tblBean = queryRunner.select("SELECT * FROM tbl WHERE id = ?", single(beanProcessor(TblBean.class)), 1L);
     
     assertEquals(2L, tblBean.getId().longValue());
     assertEquals("a_property", tblBean.getName());
@@ -375,7 +387,7 @@ public class QueryRunnerTest {
     Instant now = Instant.now();
     queryRunner.execute("INSERT INTO tbl(id, name, instant, active, amount, num) VALUES(?,?,?,?,?,?)", 1L, "a", Timestamp.from(now), false, BigDecimal.ONE, 2);
     
-    TblBeanWithConstructor tblBean = queryRunner.select("SELECT * FROM tbl WHERE id = ?", single(mapToBean(TblBeanWithConstructor.class)), 1L);
+    TblBeanWithConstructor tblBean = queryRunner.select("SELECT * FROM tbl WHERE id = ?", single(beanProcessor(TblBeanWithConstructor.class)), 1L);
     
     assertEquals(2L, tblBean.getId().longValue());
     assertEquals("a_constructor", tblBean.getName());
