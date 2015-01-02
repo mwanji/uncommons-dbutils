@@ -39,7 +39,7 @@ import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.map;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.single;
 import static com.moandjiezana.uncommons.dbutils.RowProcessor.firstColumn;
 import static com.moandjiezana.uncommons.dbutils.RowProcessor.mapToFields;
-import static com.moandjiezana.uncommons.dbutils.RowProcessor.mapToBean;
+import static com.moandjiezana.uncommons.dbutils.RowProcessor.fieldsProcessor;
 
 try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:")) {
   QueryRunner queryRunner = QueryRunner.create(connection);
@@ -60,10 +60,10 @@ try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:")) {
   Map<String, Object> person = queryRunner.select("SELECT * FROM persons WHERE id = ?", single(new MapRowProcessor(), 1L);
   
   // Create a custom Person object for each row returned by the query
-  List<Person> persons = queryRunner.select("SELECT * FROM people", list(mapToFields(Person.class)));
+  List<Person> persons = queryRunner.select("SELECT * FROM people", list(fieldsProcessor(Person.class)));
   
   // Create a custom Address object for each row, this time using JavaBean-style access (includes support for @ConstructorProperties)
-  List<Address> addresses = queryRunner.select("SELECT * FROM addresses", list(mapToBean(Address.class)));
+  List<Address> addresses = queryRunner.select("SELECT * FROM addresses", list(beanProcessor(Address.class)));
   
   // Create a Map of primary keys to Person objects, i.e. { 1: Person(...), 2: Person(...) }
   Map<Long, Person personsMap = queryRunner.select("SELECT * FROM persons", ResultSetHandler.map("id", Long.class, personRowProcessor));

@@ -76,12 +76,12 @@ public interface RowProcessor<T> {
   }
 
 
-  static <T> RowProcessor<T> mapToFields(Class<T> objectClass) {
+  static <T> RowProcessor<T> fieldsProcessor(Class<T> objectClass) {
     return new ObjectRowProcessor<T>(ObjectRowProcessor.noArgsCreator(objectClass), ObjectRowProcessor.matching());
   }
 
 
-  static <T> RowProcessor<T> mapToBean(Class<T> beanClass) {
+  static <T> RowProcessor<T> beanProcessor(Class<T> beanClass) {
     return new ObjectRowProcessor<T>(beanInstanceCreator(beanClass), properties(beanClass));
   }
 }
