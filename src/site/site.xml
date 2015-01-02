@@ -8,9 +8,6 @@ xsi:schemaLocation="http://maven.apache.org/DECORATION/1.3.0 http://maven.apache
   <version position="none" />
 
   <skin>
-    <!--groupId>org.apache.maven.skins</groupId>
-    <artifactId>maven-fluido-skin</artifactId>
-    <version>1.3.1</version-->
     <groupId>lt.velykis.maven.skins</groupId>
     <artifactId>reflow-maven-skin</artifactId>
     <version>1.1.1</version>
