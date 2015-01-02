@@ -14,6 +14,7 @@ Full documentation is at https://mwanji.github.io/uncommons-dbutils
 * Basic debug logging with [SLF4J](http://www.slf4j.org)
 * A small number of easily-composable interfaces
 * Takes advantage of Java 8 lambdas for concise code
+* Tested against an in-memory database, rather than against mocks
 
 ## Installation
 
@@ -37,8 +38,10 @@ import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.list;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.map;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.single;
 import static com.moandjiezana.uncommons.dbutils.RowProcessor.firstColumn;
+import static com.moandjiezana.uncommons.dbutils.RowProcessor.mapToFields;
+import static com.moandjiezana.uncommons.dbutils.RowProcessor.mapToBean;
 
-try (Connection connection = // obtain connection) {
+try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:")) {
   QueryRunner queryRunner = QueryRunner.create(connection);
   
   // Insert a record and retrieve its primary key
@@ -57,9 +60,10 @@ try (Connection connection = // obtain connection) {
   Map<String, Object> person = queryRunner.select("SELECT * FROM persons WHERE id = ?", single(new MapRowProcessor(), 1L);
   
   // Create a custom Person object for each row returned by the query
-  // Note that the ObjectRowProcessor, like most uncommons-dbutils classes, can be reused across queries, QueryRunners and threads
-  ObjectRowProcessor<Person> personRowProcessor = new ObjectRowProcessor<Person>(Person.class, ObjectRowProcessor.matching());
-  List<Person> persons = queryRunner.select("SELECT * FROM persons", list(personRowProcessor));
+  List<Person> persons = queryRunner.select("SELECT * FROM people", list(mapToFields(Person.class)));
+  
+  // Create a custom Address object for each row, this time using JavaBean-style access (includes support for @ConstructorProperties)
+  List<Address> addresses = queryRunner.select("SELECT * FROM addresses", list(mapToBean(Address.class)));
   
   // Create a Map of primary keys to Person objects, i.e. { 1: Person(...), 2: Person(...) }
   Map<Long, Person personsMap = queryRunner.select("SELECT * FROM persons", ResultSetHandler.map("id", Long.class, personRowProcessor));

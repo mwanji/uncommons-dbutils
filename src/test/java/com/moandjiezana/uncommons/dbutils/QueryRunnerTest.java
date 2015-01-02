@@ -1,12 +1,17 @@
 package com.moandjiezana.uncommons.dbutils;
 
 import static com.moandjiezana.uncommons.dbutils.MapRowProcessor.table;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.beanInstanceCreator;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.noArgsCreator;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.table;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.underscoresToCamel;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.VOID;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.list;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.map;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.optional;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.single;
 import static com.moandjiezana.uncommons.dbutils.RowProcessor.firstColumn;
+import static com.moandjiezana.uncommons.dbutils.RowProcessor.mapToBean;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -17,7 +22,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
-import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -27,13 +31,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
-import com.moandjiezana.uncommons.dbutils.functions.SupplierWithException;
+import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
 import com.moandjiezana.uncommons.dbutils.junit.TemporaryConnection;
 
 public class QueryRunnerTest {
@@ -41,7 +46,7 @@ public class QueryRunnerTest {
   @Rule
   public final TemporaryConnection connection = new TemporaryConnection("jdbc:h2:mem:");
   private QueryRunner queryRunner;
-  private final ObjectRowProcessor<Tbl> tblRowProcessor = new ObjectRowProcessor<Tbl>(privateConstructor(Tbl.class), ObjectRowProcessor.matching());
+  private final ObjectRowProcessor<Tbl> tblRowProcessor = new ObjectRowProcessor<Tbl>(beanInstanceCreator(Tbl.class), ObjectRowProcessor.matching());
 
   @Before
   public void before() throws Exception {
@@ -125,7 +130,7 @@ public class QueryRunnerTest {
     Instant now = Instant.now();
     Long id = queryRunner.insert("INSERT INTO tbl_underscore(name_of, instant_at, is_active, amount_owed, num_owned) VALUES(?,?,?,?,?)", single(firstColumn()), "abc1", Timestamp.from(now), true, BigDecimal.valueOf(1.13), 5);
     
-    TblUnderscore tbl = queryRunner.select("SELECT * FROM tbl_underscore WHERE id_tbl=?", single(new ObjectRowProcessor<TblUnderscore>(privateConstructor(TblUnderscore.class), ObjectRowProcessor.underscoresToCamel())), id);
+    TblUnderscore tbl = queryRunner.select("SELECT * FROM tbl_underscore WHERE id_tbl=?", single(new ObjectRowProcessor<TblUnderscore>(beanInstanceCreator(TblUnderscore.class), ObjectRowProcessor.underscoresToCamel())), id);
     
     assertEquals(1L, tbl.idTbl.longValue());
     assertEquals("abc1", tbl.nameOf);
@@ -310,7 +315,7 @@ public class QueryRunnerTest {
   public void should_set_object_field_to_null_if_not_found_in_result_set() throws Exception {
     queryRunner.execute("INSERT INTO tbl(id, name) VALUES(?,?)", 1L, "a");
     
-    ValueOf valueOf = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ObjectRowProcessor<ValueOf>(privateConstructor(ValueOf.class), (rs, i, o) -> { return Optional.empty(); })), 1L);
+    ValueOf valueOf = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ObjectRowProcessor<ValueOf>(beanInstanceCreator(ValueOf.class), (rs, i, o) -> { return Optional.empty(); })), 1L);
     
     assertNull(valueOf.value);
   }
@@ -329,34 +334,55 @@ public class QueryRunnerTest {
     assertThat(eitherNull, contains("b-null", "null-3.00"));
   }
   
-  private static class Tbl {
-    private Long id;
-    private String name;
-    private Instant instant;
-    private Boolean active;
-    private BigDecimal amount;
-    private int num;
-    private boolean active2;
-  }
-  
-  private static class TblUnderscore {
-    private Long idTbl;
-    private String nameOf;
-    private Instant instantAt;
-    private Boolean isActive;
-    private BigDecimal amountOwed;
-    private int numOwned;
-  }
-  
-  private static class ValueOf {
-    private String value;
+  @Test
+  public void should_combine_multiple_row_processors() throws Exception {
+    queryRunner.batch("INSERT INTO tbl(name) VALUES(?)", asList(asList("a"), asList("b")));
+    queryRunner.batch("INSERT INTO tbl_underscore(name_of) VALUES(?)", asList(asList("a_"), asList("b_")));
     
-    @SuppressWarnings("unused")
-    public static ValueOf valueOf(String value) {
-      ValueOf valueOf = new ValueOf();
-      valueOf.value = value;
-      return valueOf;
-    }
+    RowProcessor<Tbl> tblTableProcessor = RowProcessor.mapToFields(Tbl.class);
+    RowProcessor<TblUnderscore> tblUnderscoreTableProcessor = new ObjectRowProcessor<TblUnderscore>(noArgsCreator(TblUnderscore.class), table("tbl_underscore", underscoresToCamel()));
+    BiConsumerWithException<Joined, Object> strategy = (joining, o) -> {
+      if (o instanceof Tbl) {
+        joining.tbl = (Tbl) o;
+      } else if (o instanceof TblUnderscore) {
+        joining.tblUnderscore = (TblUnderscore) o;
+      }
+    };
+    RowProcessor<Joined> rowProcessor = new ObjectRowProcessor<Joined>(beanInstanceCreator(Joined.class), (rs, i, o) -> Optional.empty()).combine(strategy, tblTableProcessor, tblUnderscoreTableProcessor);
+    List<Joined> joinings = queryRunner.select("SELECT tbl.*, tbl_underscore.* FROM tbl, tbl_underscore WHERE tbl.id = tbl_underscore.id_tbl", list(rowProcessor));
+    
+    Stream<String> joiningStrings = joinings.stream().map(j -> j.tbl.id + "-" + j.tbl.name + "/" + j.tblUnderscore.idTbl + "-" + j.tblUnderscore.nameOf);
+    assertThat(joiningStrings.collect(toList()), contains("1-a/1-a_", "2-b/2-b_"));
+  }
+  
+  @Test
+  public void should_use_javabean_setters() throws Exception {
+    Instant now = Instant.now();
+    queryRunner.execute("INSERT INTO tbl(id, name, instant, active, amount, num) VALUES(?,?,?,?,?,?)", 1L, "a", Timestamp.from(now), false, BigDecimal.ONE, 2);
+    
+    TblBean tblBean = queryRunner.select("SELECT * FROM tbl WHERE id = ?", single(mapToBean(TblBean.class)), 1L);
+    
+    assertEquals(2L, tblBean.getId().longValue());
+    assertEquals("a_property", tblBean.getName());
+    assertEquals(now.plusSeconds(60), tblBean.getInstant());
+    assertTrue(tblBean.isActive());
+    assertEquals(BigDecimal.valueOf(200, 2), tblBean.getAmount());
+    assertEquals(3, tblBean.getNum());
+  }
+  
+  @Test
+  public void should_use_constructor_properties() throws Exception {
+    Instant now = Instant.now();
+    queryRunner.execute("INSERT INTO tbl(id, name, instant, active, amount, num) VALUES(?,?,?,?,?,?)", 1L, "a", Timestamp.from(now), false, BigDecimal.ONE, 2);
+    
+    TblBeanWithConstructor tblBean = queryRunner.select("SELECT * FROM tbl WHERE id = ?", single(mapToBean(TblBeanWithConstructor.class)), 1L);
+    
+    assertEquals(2L, tblBean.getId().longValue());
+    assertEquals("a_constructor", tblBean.getName());
+    assertEquals(now.plusSeconds(60), tblBean.getInstant());
+    assertTrue(tblBean.isActive());
+    assertEquals(BigDecimal.valueOf(200, 2), tblBean.getAmount());
+    assertEquals(3, tblBean.getNum());
   }
   
   private QueryRunner prepare(QueryRunner qr) throws Exception {
@@ -366,14 +392,5 @@ public class QueryRunnerTest {
     qr.execute("CREATE TABLE tbl_underscore (id_tbl BIGINT AUTO_INCREMENT PRIMARY KEY, name_of VARCHAR(255), instant_at TIMESTAMP, is_active BOOLEAN, amount_owed DECIMAL(5,2), num_owned INT)");
     
     return qr;
-  }
-  
-  private static <T> SupplierWithException<T> privateConstructor(Class<T> objectClass) {
-    return () -> {
-      Constructor<T> c = objectClass.getDeclaredConstructor();
-      c.setAccessible(true);
-      
-      return c.newInstance();
-    };
   }
 }

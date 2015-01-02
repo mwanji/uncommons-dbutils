@@ -1,7 +1,12 @@
 package com.moandjiezana.uncommons.dbutils;
 
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.beanInstanceCreator;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.properties;
+
 import java.sql.ResultSet;
 import java.util.Optional;
+
+import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
 
 /**
  * Converts a {@link ResultSet} to an instance of T
@@ -21,6 +26,18 @@ public interface RowProcessor<T> {
    *    if something goes wrong
    */
   T handle(ResultSet resultSet) throws Exception;
+  
+  
+  default RowProcessor<T> combine(BiConsumerWithException<T, Object> strategy, RowProcessor<?>... rowProcessors) {
+    return (rs) -> {
+      T result = handle(rs);
+      for (RowProcessor<?> rowProcessor : rowProcessors) {
+        strategy.accept(result, rowProcessor.handle(rs));
+      }
+      
+      return result;
+    };
+  }
 
   /**
    * @param <T>
@@ -56,5 +73,15 @@ public interface RowProcessor<T> {
    */
   static <T> RowProcessor<Optional<T>> optional(RowProcessor<T> rowProcessor) {
     return rs -> Optional.ofNullable(rowProcessor.handle(rs));
+  }
+
+
+  static <T> RowProcessor<T> mapToFields(Class<T> objectClass) {
+    return new ObjectRowProcessor<T>(ObjectRowProcessor.noArgsCreator(objectClass), ObjectRowProcessor.matching());
+  }
+
+
+  static <T> RowProcessor<T> mapToBean(Class<T> beanClass) {
+    return new ObjectRowProcessor<T>(beanInstanceCreator(beanClass), properties(beanClass));
   }
 }

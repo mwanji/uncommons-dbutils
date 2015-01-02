@@ -1,16 +1,26 @@
 package com.moandjiezana.uncommons.dbutils;
 
+import java.beans.BeanInfo;
+import java.beans.ConstructorProperties;
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
 import java.lang.reflect.AccessibleObject;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
-import com.moandjiezana.uncommons.dbutils.functions.SupplierWithException;
+import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
 
 public class ObjectRowProcessor<T> implements RowProcessor<T> {
   
-  public static final <U> ColumnMapper<U> matching() {
+  public static <U> ColumnMapper<U> matching() {
     return (rs, i, instance) -> {
       String columnLabel = rs.getMetaData().getColumnLabel(i);
       for (Field field : instance.getClass().getDeclaredFields()) {
@@ -23,7 +33,23 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
     };
   }
   
-  public static final <U> ColumnMapper<U> underscoresToCamel() {
+  public static <U> ColumnMapper<U> properties(Class<U> beanClass) {
+    try {
+      BeanInfo beanInfo = Introspector.getBeanInfo(beanClass);
+      PropertyDescriptor[] propertyDescriptors = beanInfo.getPropertyDescriptors();
+      
+      Map<String, Optional<AccessibleObject>> columnSetters = Arrays.stream(propertyDescriptors).collect(Collectors.toMap(pd -> pd.getName().toLowerCase(), pd -> Optional.ofNullable(pd.getWriteMethod())));
+      
+      return (rs, i, instance) -> {
+        String columnLabel = rs.getMetaData().getColumnLabel(i).toLowerCase();
+        return columnSetters.getOrDefault(columnLabel, Optional.empty());
+      };
+    } catch (IntrospectionException e) {
+      throw new RuntimeException(e);
+    }
+  }
+  
+  public static <U> ColumnMapper<U> underscoresToCamel() {
     return (rs, columnIndex, instance) -> {
       StringBuilder sb = new StringBuilder();
       String col = rs.getMetaData().getColumnLabel(columnIndex);
@@ -49,24 +75,72 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
     };
   }
   
-  public static final <U> SupplierWithException<U> beanCreator(Class<U> beanClass) {
-    return () -> {
+  public static <T> ColumnMapper<T> table(String table, ColumnMapper<T> columnMapper) {
+    return (rs, i, o) -> {
+      String tableName = rs.getMetaData().getTableName(i);
+      if (!tableName.equalsIgnoreCase(table)) {
+        return Optional.empty();
+      }
+      
+      return columnMapper.apply(rs, i, o);
+    };
+  }
+  
+  public static final <U> FunctionWithException<ResultSet, U> beanInstanceCreator(Class<U> beanClass) {
+    return (rs) -> {
+      for (Constructor<?> c : beanClass.getConstructors()) {
+        if (c.isAnnotationPresent(ConstructorProperties.class)) {
+          String[] constructorProperties = c.getAnnotation(ConstructorProperties.class).value();
+          Class<?>[] constructorArgumentTypes = c.getParameterTypes();
+          Object[] constructorArguments = new Object[constructorProperties.length];
+          
+          for (int i = 0; i < constructorProperties.length; i++) {
+            String constructorProperty = constructorProperties[i];
+            constructorArguments[i] = rs.getObject(constructorProperty);
+            Class<?> constructorArgumentType = constructorArgumentTypes[i];
+            if (constructorArgumentType == boolean.class) {
+              constructorArguments[i] = rs.getBoolean(constructorProperty);
+            } else if (constructorArgumentType == int.class) {
+              constructorArguments[i] = rs.getInt(constructorProperty);
+            } else {
+              constructorArguments[i] = Converters.INSTANCE.convert(constructorArgumentType, rs.getObject(constructorProperty));
+            }
+          }
+          
+          return beanClass.cast(c.newInstance(constructorArguments));
+        }
+      }
+      
       return beanClass.getConstructor().newInstance();
     };
   }
   
-  private final SupplierWithException<T> instanceCreator;
+  public static final <U> FunctionWithException<ResultSet, U> noArgsCreator(Class<U> objectClass) {
+    return (rs) -> {
+      Constructor<U> constructor = objectClass.getDeclaredConstructor();
+      constructor.setAccessible(true);
+      
+      return constructor.newInstance();
+    };
+  }
+  
+  @FunctionalInterface
+  public static interface ColumnMapper<T> {
+    public Optional<AccessibleObject> apply(ResultSet rs, int columnIndex, T instance) throws Exception;
+  }
+  
+  private final FunctionWithException<ResultSet, T> instanceCreator;
   private final ColumnMapper<T> columnMapper;
   private final Converters converters = Converters.INSTANCE;
   
-  public ObjectRowProcessor(SupplierWithException<T> instanceCreator, ColumnMapper<T> columnMapper) {
+  public ObjectRowProcessor(FunctionWithException<ResultSet, T> instanceCreator, ColumnMapper<T> columnMapper) {
     this.instanceCreator = instanceCreator;
     this.columnMapper = columnMapper;
   }
 
   @Override
   public T handle(ResultSet rs) throws Exception {
-    T instance = instanceCreator.get();
+    T instance = instanceCreator.apply(rs);
     for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
       Optional<AccessibleObject> optional = columnMapper.apply(rs, i, instance);
       if (!optional.isPresent()) {
@@ -74,30 +148,31 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
       }
       
       Accessor field = new Accessor(optional.get());
-      if (field.getType() == boolean.class) {
-        field.set(instance, rs.getBoolean(i));
-      } else if (field.getType() == int.class) {
-        field.set(instance, rs.getInt(i));
-      } else {
-        field.set(instance, converters.convert(field.getType(), rs.getObject(i)));
-      }
+      setAccessor(instance, field, rs, i, converters);
     };
     
     return instance;
   }
-  
-  @FunctionalInterface
-  private static interface ColumnMapper<T> {
-    public Optional<AccessibleObject> apply(ResultSet rs, int columnIndex, T instance) throws Exception;
+
+  private static void setAccessor(Object instance, Accessor accessor, ResultSet rs, int i, Converters converters) throws SQLException {
+    if (accessor.getType() == boolean.class) {
+      accessor.set(instance, rs.getBoolean(i));
+    } else if (accessor.getType() == int.class) {
+      accessor.set(instance, rs.getInt(i));
+    } else {
+      accessor.set(instance, converters.convert(accessor.getType(), rs.getObject(i)));
+    }
   }
   
   private static class Accessor {
     final Field field;
     final Method method;
+    private Constructor<?> constructor;
     
     Accessor(AccessibleObject accessibleObject) {
       this.field = accessibleObject instanceof Field ? (Field) accessibleObject : null;
       this.method = accessibleObject instanceof Method ? (Method) accessibleObject : null;
+      this.constructor = accessibleObject instanceof Constructor ? (Constructor<?>) accessibleObject : null;
       accessibleObject.setAccessible(true);
     }
     
@@ -109,7 +184,7 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
       try {
         if (field != null) {
           field.set(instance, value);
-        } else {
+        } else if (method != null) {
           method.invoke(instance, value);
         }
       } catch (Exception e) {
