@@ -1,5 +1,7 @@
 package com.moandjiezana.uncommons.dbutils;
 
+import static java.util.stream.Collectors.toMap;
+
 import java.beans.BeanInfo;
 import java.beans.ConstructorProperties;
 import java.beans.IntrospectionException;
@@ -12,77 +14,88 @@ import java.lang.reflect.Method;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
 
 public class ObjectRowProcessor<T> implements RowProcessor<T> {
   
-  public static <U> ColumnMapper<U> matching() {
+  /**
+   * @param metaDataMapper a mapper that returns the field or method corresponding to a given name
+   * @return a mapper that does not change the column name
+   */
+  public static <T> MetaDataMapper<T, Optional<AccessibleObject>> matching(MetaDataMapper<String, Optional<AccessibleObject>> metaDataMapper) {
     return (rs, i, instance) -> {
       String columnLabel = rs.getMetaData().getColumnLabel(i);
-      for (Field field : instance.getClass().getDeclaredFields()) {
-        if (field.getName().equalsIgnoreCase(columnLabel)) {
-          return Optional.of(field);
-        }
-      }
       
-      return Optional.empty();
+      return metaDataMapper.apply(rs, i, columnLabel);
     };
   }
-  
-  public static <U> ColumnMapper<U> properties(Class<U> beanClass) {
+
+  /**
+   * @param metaDataMapper a mapper that returns the field or method corresponding to a given name
+   * @return a mapper that converts names with underscores to camelCase
+   */
+  public static <T> MetaDataMapper<T, Optional<AccessibleObject>> underscoresToCamel(MetaDataMapper<String, Optional<AccessibleObject>> metaDataMapper) {
+    Map<String, String> cache = new HashMap<>();
+    
+    return (rs, columnIndex, instance) -> {
+      String mappedColumn = cache.computeIfAbsent(rs.getMetaData().getColumnLabel(columnIndex), col -> {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < col.length(); i++) {
+          char ch = col.charAt(i);
+          if (ch == '_') {
+            i++;
+            sb.append(Character.toUpperCase(col.charAt(i)));
+          } else {
+            sb.append(Character.toLowerCase(ch));
+          }
+        }
+
+        return sb.toString();
+      });
+      
+      return metaDataMapper.apply(rs, columnIndex, mappedColumn);
+    };
+  }
+
+  /**
+   * @param beanClass the class to be converted to
+   * @return a mapper that matches the given names to JavaBean-style properties
+   */
+  public static MetaDataMapper<String, Optional<AccessibleObject>> properties(Class<?> beanClass) {
     try {
       BeanInfo beanInfo = Introspector.getBeanInfo(beanClass);
       PropertyDescriptor[] propertyDescriptors = beanInfo.getPropertyDescriptors();
       
-      Map<String, Optional<AccessibleObject>> columnSetters = Arrays.stream(propertyDescriptors).collect(Collectors.toMap(pd -> pd.getName().toLowerCase(), pd -> Optional.ofNullable(pd.getWriteMethod())));
+      Map<String, Optional<AccessibleObject>> columnSetters = Arrays.stream(propertyDescriptors).collect(toMap(pd -> pd.getName().toLowerCase(), pd -> Optional.ofNullable(pd.getWriteMethod())));
       
-      return (rs, i, instance) -> {
-        String columnLabel = rs.getMetaData().getColumnLabel(i).toLowerCase();
-        return columnSetters.getOrDefault(columnLabel, Optional.empty());
-      };
+      return (rs, i, columnName) -> columnSetters.getOrDefault(columnName.toLowerCase(), Optional.empty());
     } catch (IntrospectionException e) {
       throw new RuntimeException(e);
     }
   }
   
-  public static <U> ColumnMapper<U> underscoresToCamel() {
-    return (rs, columnIndex, instance) -> {
-      StringBuilder sb = new StringBuilder();
-      String col = rs.getMetaData().getColumnLabel(columnIndex);
-      for (int i = 0; i < col.length(); i++) {
-        char ch = col.charAt(i);
-        if (ch == '_') {
-          i++;
-          sb.append(Character.toUpperCase(col.charAt(i)));
-        } else {
-          sb.append(Character.toLowerCase(ch));
-        }
-      }
-      
-      col = sb.toString();
-      
-      for (Field field : instance.getClass().getDeclaredFields()) {
-        if (field.getName().equalsIgnoreCase(col)) {
-          return Optional.of(field);
-        }
-      }
-      
-      return Optional.empty();
-    };
+  /**
+   * @param objectClass the class to be converted to
+   * @return a mapper that matches the given names to fields
+   */
+  public static MetaDataMapper<String, Optional<AccessibleObject>> fields(Class<?> objectClass) {
+    Map<String, Optional<AccessibleObject>> fields = Arrays.stream(objectClass.getDeclaredFields()).collect(toMap(field -> field.getName().toLowerCase(), field -> Optional.of(field)));
+    
+    return (rs, i, columnName) -> fields.getOrDefault(columnName.toLowerCase(), Optional.empty());
   }
   
-  public static <T> ColumnMapper<T> table(String table, ColumnMapper<T> columnMapper) {
+  public static <T> MetaDataMapper<T, Optional<AccessibleObject>> table(String table, MetaDataMapper<T, Optional<AccessibleObject>> metaDataMapper) {
     return (rs, i, o) -> {
       String tableName = rs.getMetaData().getTableName(i);
       if (!tableName.equalsIgnoreCase(table)) {
         return Optional.empty();
       }
       
-      return columnMapper.apply(rs, i, o);
+      return metaDataMapper.apply(rs, i, o);
     };
   }
   
@@ -125,24 +138,24 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
   }
   
   @FunctionalInterface
-  public static interface ColumnMapper<T> {
-    public Optional<AccessibleObject> apply(ResultSet rs, int columnIndex, T instance) throws Exception;
+  public static interface MetaDataMapper<T, R> {
+    public R apply(ResultSet rs, int columnIndex, T instance) throws Exception;
   }
   
   private final FunctionWithException<ResultSet, T> instanceCreator;
-  private final ColumnMapper<T> columnMapper;
+  private final MetaDataMapper<T, Optional<AccessibleObject>> metaDataMapper;
   private final Converters converters = Converters.INSTANCE;
   
-  public ObjectRowProcessor(FunctionWithException<ResultSet, T> instanceCreator, ColumnMapper<T> columnMapper) {
+  public ObjectRowProcessor(FunctionWithException<ResultSet, T> instanceCreator, MetaDataMapper<T, Optional<AccessibleObject>> metaDataMapper) {
     this.instanceCreator = instanceCreator;
-    this.columnMapper = columnMapper;
+    this.metaDataMapper = metaDataMapper;
   }
 
   @Override
   public T handle(ResultSet rs) throws Exception {
     T instance = instanceCreator.apply(rs);
     for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
-      Optional<AccessibleObject> optional = columnMapper.apply(rs, i, instance);
+      Optional<AccessibleObject> optional = metaDataMapper.apply(rs, i, instance);
       if (!optional.isPresent()) {
         continue;
       }

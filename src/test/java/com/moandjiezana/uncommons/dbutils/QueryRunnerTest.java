@@ -2,6 +2,8 @@ package com.moandjiezana.uncommons.dbutils;
 
 import static com.moandjiezana.uncommons.dbutils.MapRowProcessor.table;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.beanInstanceCreator;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.fields;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.matching;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.noArgsCreator;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.table;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.underscoresToCamel;
@@ -46,7 +48,7 @@ public class QueryRunnerTest {
   @Rule
   public final TemporaryConnection connection = new TemporaryConnection("jdbc:h2:mem:");
   private QueryRunner queryRunner;
-  private final ObjectRowProcessor<Tbl> tblRowProcessor = new ObjectRowProcessor<Tbl>(beanInstanceCreator(Tbl.class), ObjectRowProcessor.matching());
+  private final ObjectRowProcessor<Tbl> tblRowProcessor = new ObjectRowProcessor<Tbl>(beanInstanceCreator(Tbl.class), matching(fields(Tbl.class)));
 
   @Before
   public void before() throws Exception {
@@ -142,7 +144,7 @@ public class QueryRunnerTest {
     Instant now = Instant.now();
     Long id = queryRunner.insert("INSERT INTO tbl_underscore(name_of, instant_at, is_active, amount_owed, num_owned) VALUES(?,?,?,?,?)", single(firstColumn()), "abc1", Timestamp.from(now), true, BigDecimal.valueOf(1.13), 5);
     
-    TblUnderscore tbl = queryRunner.select("SELECT * FROM tbl_underscore WHERE id_tbl=?", single(new ObjectRowProcessor<TblUnderscore>(beanInstanceCreator(TblUnderscore.class), ObjectRowProcessor.underscoresToCamel())), id);
+    TblUnderscore tbl = queryRunner.select("SELECT * FROM tbl_underscore WHERE id_tbl=?", single(new ObjectRowProcessor<TblUnderscore>(beanInstanceCreator(TblUnderscore.class), underscoresToCamel(fields(TblUnderscore.class)))), id);
     
     assertEquals(1L, tbl.idTbl.longValue());
     assertEquals("abc1", tbl.nameOf);
@@ -191,7 +193,7 @@ public class QueryRunnerTest {
   public void should_map_result_set_to_map_of_id_to_object() throws Exception {
     queryRunner.batch("INSERT INTO tbl(name) VALUES(?)", asList(singletonList("a"), singletonList("b")));
     
-    Map<Long, Tbl> tbls = queryRunner.select("SELECT * FROM tbl", map("id", Long.class, tblRowProcessor));
+    Map<Long, Tbl> tbls = queryRunner.select("SELECT id AS idd, name FROM tbl", map("id", Long.class, tblRowProcessor));
         
     assertEquals("a", tbls.get(1L).name);
     assertEquals("b", tbls.get(2L).name);
@@ -352,7 +354,7 @@ public class QueryRunnerTest {
     queryRunner.batch("INSERT INTO tbl_underscore(name_of) VALUES(?)", asList(asList("a_"), asList("b_")));
     
     RowProcessor<Tbl> tblTableProcessor = RowProcessor.fieldsProcessor(Tbl.class);
-    RowProcessor<TblUnderscore> tblUnderscoreTableProcessor = new ObjectRowProcessor<TblUnderscore>(noArgsCreator(TblUnderscore.class), table("tbl_underscore", underscoresToCamel()));
+    RowProcessor<TblUnderscore> tblUnderscoreTableProcessor = new ObjectRowProcessor<TblUnderscore>(noArgsCreator(TblUnderscore.class), table("tbl_underscore", underscoresToCamel(fields(TblUnderscore.class))));
     BiConsumerWithException<Joined, Object> strategy = (joining, o) -> {
       if (o instanceof Tbl) {
         joining.tbl = (Tbl) o;
@@ -361,7 +363,7 @@ public class QueryRunnerTest {
       }
     };
     RowProcessor<Joined> rowProcessor = new ObjectRowProcessor<Joined>(beanInstanceCreator(Joined.class), (rs, i, o) -> Optional.empty()).combine(strategy, tblTableProcessor, tblUnderscoreTableProcessor);
-    List<Joined> joinings = queryRunner.select("SELECT tbl.*, tbl_underscore.* FROM tbl, tbl_underscore WHERE tbl.id = tbl_underscore.id_tbl", list(rowProcessor));
+    List<Joined> joinings = queryRunner.select("SELECT tbl.*, tbl_underscore.id_tbl, tbl_underscore.name FROM tbl, tbl_underscore WHERE tbl.id = tbl_underscore.id_tbl", list(rowProcessor));
     
     Stream<String> joiningStrings = joinings.stream().map(j -> j.tbl.id + "-" + j.tbl.name + "/" + j.tblUnderscore.idTbl + "-" + j.tblUnderscore.nameOf);
     assertThat(joiningStrings.collect(toList()), contains("1-a/1-a_", "2-b/2-b_"));

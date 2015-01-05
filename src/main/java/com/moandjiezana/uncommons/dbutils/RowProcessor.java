@@ -1,6 +1,9 @@
 package com.moandjiezana.uncommons.dbutils;
 
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.beanInstanceCreator;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.fields;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.matching;
+import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.noArgsCreator;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.properties;
 
 import java.sql.ResultSet;
@@ -75,13 +78,23 @@ public interface RowProcessor<T> {
     return rs -> Optional.ofNullable(rowProcessor.handle(rs));
   }
 
-
+  /**
+   * @param objectClass
+   *    The class to map the rows to
+   * @param <T> The type of the mapped row
+   * @return A RowProcessor that uses field access to populate instances with values from columns with the same name
+   */
   static <T> RowProcessor<T> fieldsProcessor(Class<T> objectClass) {
-    return new ObjectRowProcessor<T>(ObjectRowProcessor.noArgsCreator(objectClass), ObjectRowProcessor.matching());
+    return new ObjectRowProcessor<T>(noArgsCreator(objectClass), matching(fields(objectClass)));
   }
 
-
+  /**
+   * @param beanClass
+   *    The class to map the rows to
+   * @param <T> The type of the mapped row
+   * @return A Row Processor that uses JavaBean conventions to create and populate instances of T
+   */
   static <T> RowProcessor<T> beanProcessor(Class<T> beanClass) {
-    return new ObjectRowProcessor<T>(beanInstanceCreator(beanClass), properties(beanClass));
+    return new ObjectRowProcessor<T>(beanInstanceCreator(beanClass), matching(properties(beanClass)));
   }
 }
