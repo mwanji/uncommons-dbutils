@@ -27,46 +27,45 @@ import java.sql.SQLException;
  */
 public class ColumnRowProcessor<T> implements RowProcessor<T> {
   
-  private final int columnIndex;
-  private final String columnName;
-  private final Class<T> objectClass;
-
-  /**
-   * 
-   * @param columnIndex
-   *    The index of the column to retrieve from the {@link ResultSet}.
-   */
-  public ColumnRowProcessor(int columnIndex) {
-    this(columnIndex, null);
-  }
-
   /**
    * @param columnIndex
    *    The index of the column to retrieve from the {@link ResultSet}.
-   * @param objectClass
-   *    The class of the returned instance. Makes custom conversion possible.
    */
-  public ColumnRowProcessor(int columnIndex, Class<T> objectClass) {
-    this(columnIndex, null, objectClass);
+  public static <T> ColumnRowProcessor<T> column(int columnIndex) {
+    return new ColumnRowProcessor<T>(columnIndex, null, null);
   }
   
   /**
    * @param columnName
    *    The name of the column to retrieve from the {@link ResultSet}.
    */
-  public ColumnRowProcessor(String columnName) {
-    this(columnName, null);
+  public static <T> ColumnRowProcessor<T> column(String columnName) {
+    return new ColumnRowProcessor<T>(0, columnName, null);
   }
-
+  
+  /**
+   * @param columnIndex
+   *    The index of the column to retrieve from the {@link ResultSet}.
+   * @param objectClass
+   *    The class of the returned instance. Makes custom conversion possible.
+   */
+  public static <T> ColumnRowProcessor<T> column(int columnIndex, Class<T> objectClass) {
+    return new ColumnRowProcessor<T>(columnIndex, null, objectClass);
+  }
+  
   /**
    * @param columnName
    *    The name of the column to retrieve from the {@link ResultSet}.
    * @param objectClass
    *    The class of the returned instance. Makes custom conversion possible.
    */
-  public ColumnRowProcessor(String columnName, Class<T> objectClass) {
-    this(0, columnName, objectClass);
+  public static <T> ColumnRowProcessor<T> column(String columnName, Class<T> objectClass) {
+    return new ColumnRowProcessor<T>(0, columnName, objectClass);
   }
+  
+  private final int columnIndex;
+  private final String columnName;
+  private final Class<T> objectClass;
 
   /**
    * @param rs
