@@ -346,7 +346,7 @@ public class QueryRunnerTest {
     
     RowProcessor<Tbl> tblTableProcessor = RowProcessor.fieldsProcessor(Tbl.class);
     RowProcessor<TblUnderscore> tblUnderscoreTableProcessor = new ObjectRowProcessor<TblUnderscore>(noArgsCreator(TblUnderscore.class), underscoresToCamel(fields(TblUnderscore.class)));
-    RowProcessor<Joined> rowProcessor = RowProcessor.container(() -> new Joined())
+    RowProcessor<Joined> rowProcessor = RowProcessor.container(Joined::new)
         .with(tblTableProcessor, (joined, tbl) -> joined.tbl = tbl)
         .with(tblUnderscoreTableProcessor, (joined, tblUnderscore) -> joined.tblUnderscore = tblUnderscore);
     List<Joined> joined = queryRunner.select("SELECT tbl.*, tbl_underscore.* FROM tbl, tbl_underscore WHERE tbl.id = tbl_underscore.id_tbl", list(rowProcessor));
