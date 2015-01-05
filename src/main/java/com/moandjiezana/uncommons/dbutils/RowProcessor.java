@@ -8,6 +8,7 @@ import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.properties;
 
 import java.sql.ResultSet;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
 
@@ -30,18 +31,30 @@ public interface RowProcessor<T> {
    */
   T handle(ResultSet resultSet) throws Exception;
   
-  
-  default RowProcessor<T> combine(BiConsumerWithException<T, Object> strategy, RowProcessor<?>... rowProcessors) {
+  /**
+   * @param withRowProcessor
+   * @param combiner
+   * @return a new RowProcessor instance that returns the result of this {@link #handle(ResultSet)}, after 
+   */
+  default <U> RowProcessor<T> with(RowProcessor<U> withRowProcessor, BiConsumerWithException<T, U> combiner) {
     return (rs) -> {
       T result = handle(rs);
-      for (RowProcessor<?> rowProcessor : rowProcessors) {
-        strategy.accept(result, rowProcessor.handle(rs));
-      }
+      
+      combiner.accept(result, withRowProcessor.handle(rs));
       
       return result;
     };
   }
-
+  
+  /**
+   * @param supplier
+   *    creates the per-row container
+   * @return a RowProcessor that is useful for chaining {@link #with(RowProcessor, BiConsumerWithException)}.
+   */
+  static <T> RowProcessor<T> container(Supplier<T> supplier) {
+    return rs -> supplier.get();
+  }
+  
   /**
    * @param <T>
    *    the type to convert the column to
@@ -63,7 +76,7 @@ public interface RowProcessor<T> {
    * @see ColumnRowProcessor
    */
   static <T> RowProcessor<T> firstColumn(Class<T> objectClass) {
-    return new ColumnRowProcessor<T>(1, objectClass);
+    return ColumnRowProcessor.column(1, objectClass);
   }
 
   /**
@@ -81,7 +94,8 @@ public interface RowProcessor<T> {
   /**
    * @param objectClass
    *    The class to map the rows to
-   * @param <T> The type of the mapped row
+   * @param <T>
+   *    The type of the mapped row
    * @return A RowProcessor that uses field access to populate instances with values from columns with the same name
    */
   static <T> RowProcessor<T> fieldsProcessor(Class<T> objectClass) {
@@ -91,7 +105,8 @@ public interface RowProcessor<T> {
   /**
    * @param beanClass
    *    The class to map the rows to
-   * @param <T> The type of the mapped row
+   * @param <T>
+   *    The type of the mapped row
    * @return A Row Processor that uses JavaBean conventions to create and populate instances of T
    */
   static <T> RowProcessor<T> beanProcessor(Class<T> beanClass) {

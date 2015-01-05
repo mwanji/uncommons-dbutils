@@ -5,7 +5,6 @@ import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.beanInstance
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.fields;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.matching;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.noArgsCreator;
-import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.table;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.underscoresToCamel;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.VOID;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.list;
@@ -14,6 +13,7 @@ import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.optional;
 import static com.moandjiezana.uncommons.dbutils.ResultSetHandler.single;
 import static com.moandjiezana.uncommons.dbutils.RowProcessor.beanProcessor;
 import static com.moandjiezana.uncommons.dbutils.RowProcessor.firstColumn;
+import static com.moandjiezana.uncommons.dbutils.RowProcessor.optional;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -29,6 +29,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +42,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
-import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
 import com.moandjiezana.uncommons.dbutils.junit.TemporaryConnection;
 
 public class QueryRunnerTest {
@@ -70,8 +71,8 @@ public class QueryRunnerTest {
     Instant now = Instant.now();
     Long id = queryRunner.insert("INSERT INTO tbl(name, instant) VALUES(?,?)", single(firstColumn()), "abc1", Timestamp.from(now));
     
-    String name = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(new ColumnRowProcessor<String>("name")), id);
-    Instant instant = queryRunner.select("SELECT instant FROM tbl WHERE id = ?", single(new ColumnRowProcessor<Instant>("instant", Instant.class)), id);
+    String name = queryRunner.select("SELECT name FROM tbl WHERE id = ?", single(ColumnRowProcessor.column("name")), id);
+    Instant instant = queryRunner.select("SELECT instant FROM tbl WHERE id = ?", single(ColumnRowProcessor.column("instant", Instant.class)), id);
 
     assertEquals("abc1", name);
     assertEquals(now, instant);
@@ -91,7 +92,7 @@ public class QueryRunnerTest {
   public void should_wrap_second_column_in_optional() throws Exception {
     queryRunner.batchInsert("INSERT INTO tbl(name) VALUES(?)", ResultSetHandler.VOID, asList(singletonList("111"), singletonList(null), singletonList("333")));
     
-    List<Optional<String>> names = queryRunner.select("SELECT id, name FROM tbl ORDER BY id ASC", list(RowProcessor.optional(new ColumnRowProcessor<String>(2))));
+    List<Optional<String>> names = queryRunner.select("SELECT id, name FROM tbl ORDER BY id ASC", list(optional(ColumnRowProcessor.column(2))));
     
     assertThat(names, contains(Optional.of("111"), Optional.empty(), Optional.of("333")));
   }
@@ -199,26 +200,16 @@ public class QueryRunnerTest {
     assertEquals("b", tbls.get(2L).name);
   }
   
-  @SuppressWarnings("unchecked")
   @Test
   public void should_map_result_set_to_map_per_table_per_row() throws Exception {
     queryRunner.batch("INSERT INTO tbl(id, name) VALUES(?,?)", asList(asList(1L, "a"), asList(2L, "b")));
     queryRunner.batch("INSERT INTO tbl_underscore(id_tbl, name_of) VALUES(?,?)", asList(asList(1L, "a_"), asList(2L, "b_")));
     
-    List<Map<String, Map<String, Object>>> tbls = queryRunner.select("SELECT tbl.id, tbl.name, tbl_underscore.id_tbl, tbl_underscore.name_of FROM tbl INNER JOIN tbl_underscore ON tbl.id = tbl_underscore.id_tbl",
-      list(rs -> {
-        Map<String, Map<String, Object>> row = new HashMap<>();
-        Map<String, MapRowProcessor> rowProcessors = new HashMap<>();
-        for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
-          String tableName = rs.getMetaData().getTableName(i).toLowerCase();
-          Map<String, Object> tableMap = row.computeIfAbsent(tableName, key -> new HashMap<String, Object>());
-          MapRowProcessor rowProcessor = rowProcessors.computeIfAbsent(tableName, key -> new MapRowProcessor(table(tableName)));
-          tableMap.putAll(rowProcessor.handle(rs)); 
-        }
-        
-        return row;
-      })
-    );
+    RowProcessor<HashMap<String, Map<String, Object>>> rp = RowProcessor.container(() -> new HashMap<String, Map<String, Object>>())
+      .with(new MapRowProcessor(table("tbl")), (row, tbl) -> row.put("tbl", new HashMap<>(tbl)))
+      .with(new MapRowProcessor(table("tbl_underscore")), (row, tbl) -> row.put("tbl_underscore", new HashMap<>(tbl)));
+    
+    List<HashMap<String, Map<String, Object>>> tbls = queryRunner.select("SELECT tbl.id, tbl.name, tbl_underscore.id_tbl, tbl_underscore.name_of FROM tbl INNER JOIN tbl_underscore ON tbl.id = tbl_underscore.id_tbl", list(rp));
     
     HashMap<String, Object> tbl1 = new HashMap<>();
     tbl1.put("id", 1L);
@@ -354,19 +345,14 @@ public class QueryRunnerTest {
     queryRunner.batch("INSERT INTO tbl_underscore(name_of) VALUES(?)", asList(asList("a_"), asList("b_")));
     
     RowProcessor<Tbl> tblTableProcessor = RowProcessor.fieldsProcessor(Tbl.class);
-    RowProcessor<TblUnderscore> tblUnderscoreTableProcessor = new ObjectRowProcessor<TblUnderscore>(noArgsCreator(TblUnderscore.class), table("tbl_underscore", underscoresToCamel(fields(TblUnderscore.class))));
-    BiConsumerWithException<Joined, Object> strategy = (joining, o) -> {
-      if (o instanceof Tbl) {
-        joining.tbl = (Tbl) o;
-      } else if (o instanceof TblUnderscore) {
-        joining.tblUnderscore = (TblUnderscore) o;
-      }
-    };
-    RowProcessor<Joined> rowProcessor = new ObjectRowProcessor<Joined>(beanInstanceCreator(Joined.class), (rs, i, o) -> Optional.empty()).combine(strategy, tblTableProcessor, tblUnderscoreTableProcessor);
-    List<Joined> joinings = queryRunner.select("SELECT tbl.*, tbl_underscore.* FROM tbl, tbl_underscore WHERE tbl.id = tbl_underscore.id_tbl", list(rowProcessor));
+    RowProcessor<TblUnderscore> tblUnderscoreTableProcessor = new ObjectRowProcessor<TblUnderscore>(noArgsCreator(TblUnderscore.class), underscoresToCamel(fields(TblUnderscore.class)));
+    RowProcessor<Joined> rowProcessor = RowProcessor.container(() -> new Joined())
+        .with(tblTableProcessor, (joined, tbl) -> joined.tbl = tbl)
+        .with(tblUnderscoreTableProcessor, (joined, tblUnderscore) -> joined.tblUnderscore = tblUnderscore);
+    List<Joined> joined = queryRunner.select("SELECT tbl.*, tbl_underscore.* FROM tbl, tbl_underscore WHERE tbl.id = tbl_underscore.id_tbl", list(rowProcessor));
     
-    Stream<String> joiningStrings = joinings.stream().map(j -> j.tbl.id + "-" + j.tbl.name + "/" + j.tblUnderscore.idTbl + "-" + j.tblUnderscore.nameOf);
-    assertThat(joiningStrings.collect(toList()), contains("1-a/1-a_", "2-b/2-b_"));
+    Stream<String> joinedStrings = joined.stream().map(j -> j.tbl.id + "-" + j.tbl.name + "/" + j.tblUnderscore.idTbl + "-" + j.tblUnderscore.nameOf);
+    assertThat(joinedStrings.collect(toList()), contains("1-a/1-a_", "2-b/2-b_"));
   }
   
   @Test
@@ -397,6 +383,26 @@ public class QueryRunnerTest {
     assertTrue(tblBean.isActive());
     assertEquals(BigDecimal.valueOf(200, 2), tblBean.getAmount());
     assertEquals(3, tblBean.getNum());
+  }
+  
+  @Test
+  public void should_combine_two_columns() throws Exception {
+    Instant now = Instant.now();
+    queryRunner.execute("INSERT INTO tbl(id, name, instant) VALUES(?,?,?)", 1L, "Africa/Johannesburg", Timestamp.from(now));
+    
+    ColumnRowProcessor<String> nameRowProcessor = ColumnRowProcessor.column("name");
+    ColumnRowProcessor<Instant> instantRowProcessor = ColumnRowProcessor.column("instant", Instant.class);
+    
+    RowProcessor<ZonedDateTime> rowProcessor = (rs) -> {
+      String zoneId = nameRowProcessor.handle(rs);
+      Instant instant = instantRowProcessor.handle(rs);
+      
+      return ZonedDateTime.ofInstant(instant, ZoneId.of(zoneId));
+    };
+    
+    ZonedDateTime zonedDateTime = queryRunner.select("SELECT name, instant FROM tbl WHERE id = ?", single(rowProcessor), 1L);
+    
+    assertEquals(ZonedDateTime.ofInstant(now, ZoneId.of("Africa/Johannesburg")), zonedDateTime);
   }
   
   private QueryRunner prepare(QueryRunner qr) throws Exception {
