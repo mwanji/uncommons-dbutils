@@ -112,7 +112,7 @@ public interface ResultSetHandler<T> {
    * @see MapResultSetHandler
    */
   static <K, V> ResultSetHandler<Map<K, V>> map(String keyColumn, Class<K> keyClass, RowProcessor<V> rowProcessor) {
-    return new MapResultSetHandler<>(column("id", keyClass), rowProcessor);
+    return new MapResultSetHandler<>(column(keyColumn, keyClass), rowProcessor);
   }
 
   /**
