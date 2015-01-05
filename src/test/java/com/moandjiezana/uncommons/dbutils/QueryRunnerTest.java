@@ -363,7 +363,7 @@ public class QueryRunnerTest {
       }
     };
     RowProcessor<Joined> rowProcessor = new ObjectRowProcessor<Joined>(beanInstanceCreator(Joined.class), (rs, i, o) -> Optional.empty()).combine(strategy, tblTableProcessor, tblUnderscoreTableProcessor);
-    List<Joined> joinings = queryRunner.select("SELECT tbl.*, tbl_underscore.id_tbl, tbl_underscore.name FROM tbl, tbl_underscore WHERE tbl.id = tbl_underscore.id_tbl", list(rowProcessor));
+    List<Joined> joinings = queryRunner.select("SELECT tbl.*, tbl_underscore.* FROM tbl, tbl_underscore WHERE tbl.id = tbl_underscore.id_tbl", list(rowProcessor));
     
     Stream<String> joiningStrings = joinings.stream().map(j -> j.tbl.id + "-" + j.tbl.name + "/" + j.tblUnderscore.idTbl + "-" + j.tblUnderscore.nameOf);
     assertThat(joiningStrings.collect(toList()), contains("1-a/1-a_", "2-b/2-b_"));
