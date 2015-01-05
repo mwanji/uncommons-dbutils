@@ -7,7 +7,7 @@ import java.util.Map;
 import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
 
 /**
- * Converts a {@link ResultSet} to a {@link Map} with one entry per row.
+ * Converts a {@link ResultSet} to a {@link Map} with one key/value pair per row.
  * 
  * @param <K>
  *    The type of the keys
@@ -31,7 +31,7 @@ public class MapResultSetHandler<K,  V> implements ResultSetHandler<Map<K,  V>> 
     return rs -> Converters.INSTANCE.convert(columnClass, rs.getObject(column));
   }
   
-  private final FunctionWithException<ResultSet, K> keyExtractor;
+  private final RowProcessor<K> keyExtractor;
   private final RowProcessor<V> rowProcessor;
 
   /**
@@ -40,7 +40,7 @@ public class MapResultSetHandler<K,  V> implements ResultSetHandler<Map<K,  V>> 
    * @param rowProcessor
    *    Creates a {@link Map} value for each row
    */
-  public MapResultSetHandler(FunctionWithException<ResultSet, K> keyExtractor, RowProcessor<V> rowProcessor) {
+  public MapResultSetHandler(RowProcessor<K> keyExtractor, RowProcessor<V> rowProcessor) {
     this.keyExtractor = keyExtractor;
     this.rowProcessor = rowProcessor;
   }
@@ -53,7 +53,7 @@ public class MapResultSetHandler<K,  V> implements ResultSetHandler<Map<K,  V>> 
     LinkedHashMap<K,  V> map = new LinkedHashMap<>();
     
     while (rs.next()) {
-      map.put(keyExtractor.apply(rs), rowProcessor.handle(rs));
+      map.put(keyExtractor.handle(rs), rowProcessor.handle(rs));
     }
     
     return map;

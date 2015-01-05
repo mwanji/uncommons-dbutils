@@ -16,7 +16,7 @@
  */
 package com.moandjiezana.uncommons.dbutils;
 
-import static com.moandjiezana.uncommons.dbutils.MapResultSetHandler.column;
+import static com.moandjiezana.uncommons.dbutils.ColumnRowProcessor.column;
 
 import java.sql.ResultSet;
 import java.util.ArrayList;
@@ -71,9 +71,7 @@ public interface ResultSetHandler<T> {
    * @return the result of invoking the underlying {@link ResultSetHandler}, wrapped in an {@link Optional}.
    */
   static <T> ResultSetHandler<Optional<T>> optional(ResultSetHandler<T> resultSetHandler) {
-    return rs -> {
-      return Optional.ofNullable(resultSetHandler.handle(rs));
-    };
+    return rs -> Optional.ofNullable(resultSetHandler.handle(rs));
   }
 
   /**
