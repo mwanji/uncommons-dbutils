@@ -93,17 +93,6 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
     return (rs, i, columnName) -> fields.getOrDefault(columnName.toLowerCase(), Optional.empty());
   }
   
-  public static <T> MetaDataMapper<T, Optional<AccessibleObject>> table(String table, MetaDataMapper<T, Optional<AccessibleObject>> metaDataMapper) {
-    return (rs, i, o) -> {
-      String tableName = rs.getMetaData().getTableName(i);
-      if (!tableName.equalsIgnoreCase(table)) {
-        return Optional.empty();
-      }
-      
-      return metaDataMapper.apply(rs, i, o);
-    };
-  }
-  
   public static final <U> FunctionWithException<ResultSet, U> beanInstanceCreator(Class<U> beanClass) {
     return (rs) -> {
       for (Constructor<?> c : beanClass.getConstructors()) {
@@ -185,12 +174,10 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
   private static class Accessor {
     final Field field;
     final Method method;
-    private Constructor<?> constructor;
     
     Accessor(AccessibleObject accessibleObject) {
       this.field = accessibleObject instanceof Field ? (Field) accessibleObject : null;
       this.method = accessibleObject instanceof Method ? (Method) accessibleObject : null;
-      this.constructor = accessibleObject instanceof Constructor ? (Constructor<?>) accessibleObject : null;
       accessibleObject.setAccessible(true);
     }
     
