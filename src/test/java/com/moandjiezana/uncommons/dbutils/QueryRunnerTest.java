@@ -1,5 +1,6 @@
 package com.moandjiezana.uncommons.dbutils;
 
+import static com.moandjiezana.uncommons.dbutils.ColumnRowProcessor.column;
 import static com.moandjiezana.uncommons.dbutils.MapRowProcessor.table;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.beanInstanceCreator;
 import static com.moandjiezana.uncommons.dbutils.ObjectRowProcessor.fields;
@@ -18,6 +19,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -31,6 +33,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -403,6 +406,37 @@ public class QueryRunnerTest {
     ZonedDateTime zonedDateTime = queryRunner.select("SELECT name, instant FROM tbl WHERE id = ?", single(rowProcessor), 1L);
     
     assertEquals(ZonedDateTime.ofInstant(now, ZoneId.of("Africa/Johannesburg")), zonedDateTime);
+  }
+  
+  @Test
+  public void should_join_one_to_many() throws Exception {
+    queryRunner.execute("CREATE TABLE a(id IDENTITY, name VARCHAR)");
+    queryRunner.execute("CREATE TABLE b(id IDENTITY, name VARCHAR, a_fk INT)");
+    Long a1Id = queryRunner.insert("INSERT INTO a(name) VALUES(?)", single(firstColumn()), "a1");
+    Long a2Id = queryRunner.insert("INSERT INTO a(name) VALUES(?)", single(firstColumn()), "a2");
+    queryRunner.batch("INSERT INTO b(name, a_fk) VALUES(?,?)", asList(asList("b1", a1Id), asList("b2", a2Id), asList("b3", a1Id), asList("b4", a2Id), asList("b5", a2Id)));
+    
+    RowProcessor<Joined.Relation> joinedRelationRowProcessor = new ObjectRowProcessor<Joined.Relation>(noArgsCreator(Joined.Relation.class), matching(fields(Joined.Relation.class))).fromTable("b");
+    RowProcessor<Joined> joinedRowProcessor = RowProcessor.fieldsProcessor(Joined.class).fromTable("a");
+    
+    MapResultSetHandler<Long, Joined> mapResultSetHandler = new MapResultSetHandler<Long, Joined>(column("id", Long.class).fromTable("a"), joinedRowProcessor, (joined, rs) -> {
+      Joined.Relation relation = joinedRelationRowProcessor.handle(rs);
+      joined.relations.add(relation);
+    });
+    
+    List<Joined> joineds = queryRunner.select("SELECT a.*, b.* FROM a INNER JOIN b ON a.id = b.a_fk ORDER BY a.id, b.id", rs -> new ArrayList<>(mapResultSetHandler.handle(rs).values()));
+    
+    assertThat(joineds, hasSize(2));
+    
+    Joined joined1 = joineds.get(0);
+    assertEquals(a1Id, joined1.id);
+    assertEquals("a1", joined1.name);
+    assertThat(joined1.relations.stream().map(tbl -> tbl.name).collect(toList()), contains("b1", "b3"));
+    
+    Joined joined2 = joineds.get(1);
+    assertEquals(a2Id, joined2.id);
+    assertEquals("a2", joined2.name);
+    assertThat(joined2.relations.stream().map(tbl -> tbl.name).collect(toList()), contains("b2", "b4", "b5"));
   }
   
   private QueryRunner prepare(QueryRunner qr) throws Exception {

@@ -3,11 +3,13 @@ package com.moandjiezana.uncommons.dbutils;
 import java.sql.ResultSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Function;
 
-import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
+import com.moandjiezana.uncommons.dbutils.functions.BiConsumerWithException;
 
 /**
- * Converts a {@link ResultSet} to a {@link Map} with one key/value pair per row.
+ * Converts a {@link ResultSet} to a {@link Map}. A key is extracted from each row. If that key is already in the {@link Map}, its value is passed on to the combiner function.
+ * Otherwise, a new key/value pair is added and the new value passed to the combiner.
  * 
  * @param <K>
  *    The type of the keys
@@ -16,33 +18,22 @@ import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
  */
 public class MapResultSetHandler<K,  V> implements ResultSetHandler<Map<K,  V>> {
   
-  /**
-   * Extracts the key from a single column.
-   * 
-   * @param column
-   *    the name of the column to extract the key from
-   * @param columnClass
-   *    the type of the column
-   * @param <U>
-   *    the type of the instance
-   * @return an instance of U
-   */
-  public static <U> FunctionWithException<ResultSet, U> column(String column, Class<U> columnClass) {
-    return rs -> Converters.INSTANCE.convert(columnClass, rs.getObject(column));
-  }
-  
   private final RowProcessor<K> keyExtractor;
   private final RowProcessor<V> rowProcessor;
+  private BiConsumerWithException<V, ResultSet> combiner;
 
   /**
    * @param keyExtractor
-   *    Creates a {@link Map} key for each row
+   *    Creates a {@link Map} key
    * @param rowProcessor
    *    Creates a {@link Map} value for each row
+   * @param combiner
+   *    Can be null.
    */
-  public MapResultSetHandler(RowProcessor<K> keyExtractor, RowProcessor<V> rowProcessor) {
+  public MapResultSetHandler(RowProcessor<K> keyExtractor, RowProcessor<V> rowProcessor, BiConsumerWithException<V, ResultSet> combiner) {
     this.keyExtractor = keyExtractor;
     this.rowProcessor = rowProcessor;
+    this.combiner = combiner != null ? combiner : (value, rs) -> {};
   }
 
   /**
@@ -51,9 +42,16 @@ public class MapResultSetHandler<K,  V> implements ResultSetHandler<Map<K,  V>> 
   @Override
   public Map<K,  V> handle(ResultSet rs) throws Exception {
     LinkedHashMap<K,  V> map = new LinkedHashMap<>();
+    Function<K, V> valueMapper = key -> {
+      try {
+        return rowProcessor.handle(rs);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    };
     
     while (rs.next()) {
-      map.put(keyExtractor.handle(rs), rowProcessor.handle(rs));
+      combiner.accept(map.computeIfAbsent(keyExtractor.handle(rs), valueMapper), rs);
     }
     
     return map;
