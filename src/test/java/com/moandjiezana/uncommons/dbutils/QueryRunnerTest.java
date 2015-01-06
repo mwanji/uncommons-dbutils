@@ -439,6 +439,17 @@ public class QueryRunnerTest {
     assertThat(joined2.relations.stream().map(tbl -> tbl.name).collect(toList()), contains("b2", "b4", "b5"));
   }
   
+  @Test
+  public void should_update_with_null_value() throws Exception {
+    queryRunner.execute("INSERT INTO tbl(name) VALUES(?)", "n");
+    queryRunner.execute("UPDATE tbl SET name = ?", new Object[] { null });
+    
+    Tbl tbl = queryRunner.select("SELECT * FROM tbl", single(tblRowProcessor));
+    
+    assertEquals(1L, tbl.id.longValue());
+    assertNull(tbl.name);
+  }
+  
   private QueryRunner prepare(QueryRunner qr) throws Exception {
     qr.execute("CREATE SCHEMA unit_test");
     qr.execute("SET SCHEMA unit_test");

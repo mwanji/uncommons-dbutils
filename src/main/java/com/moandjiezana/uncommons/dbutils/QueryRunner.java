@@ -66,6 +66,7 @@ public class QueryRunner {
   
   private final SupplierWithException<Connection> connection;
   private final ConsumerWithException<Connection> finalizer;
+  private boolean useParameterMetaData = true;
 
   /**
    * <pre><code>
@@ -143,10 +144,8 @@ public class QueryRunner {
    * @param <T>
    *    the type of instance to return
    * @return an instance of T as determined by resultSetHandler
-   * @throws Exception
-   *    if anything goes wrong
    */
- public <T> T select(String sql, ResultSetHandler<T> resultSetHandler, Object... params) throws Exception {
+ public <T> T select(String sql, ResultSetHandler<T> resultSetHandler, Object... params) {
     return run(c -> {
       log(sql, params);
       try (PreparedStatement stmt = c.prepareStatement(sql);) {
@@ -168,10 +167,8 @@ public class QueryRunner {
    *    values for the SQL placeholders
    *
    * @return The number of rows updated.
-   * @throws Exception
-   *    if anything goes wrong
    */
-  public int execute(String sql, Object... params) throws Exception {
+  public int execute(String sql, Object... params) {
     return run(c -> {
       log(sql, params);
       try (PreparedStatement statement = c.prepareStatement(sql);) {
@@ -192,10 +189,8 @@ public class QueryRunner {
    * @param <T>
    *    the type of instance to return
    * @return an instance of T as determined by resultSetHandler
-   * @throws Exception
-   *    if anything goes wrong
    */
-  public <T> T insert(String sql, ResultSetHandler<T> resultSetHandler, Object... params) throws Exception {
+  public <T> T insert(String sql, ResultSetHandler<T> resultSetHandler, Object... params) {
     return run(c -> {
       log(sql, params);
       try (PreparedStatement stmt = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
@@ -216,10 +211,8 @@ public class QueryRunner {
    * @param batchParams
    *    values for the SQL placeholders. Eg. <code>Arrays.asList(Arrays.asList(1L), Arrays.asList(2L))</code> will create a batch of 2 queries, using 1, then 2, as values.
    * @return the number of affected rows for each time the SQL was executed
-   * @throws Exception
-   *    if anything goes wrong
    */
-  public int[] batch(String sql, List<List<Object>> batchParams) throws Exception {
+  public int[] batch(String sql, List<List<Object>> batchParams) {
     return run(c -> {
       try (PreparedStatement statement = c.prepareStatement(sql);) {
         for (List<Object> params : batchParams) {
@@ -245,10 +238,8 @@ public class QueryRunner {
    * @param <T>
    *    the type of instance to return
    * @return an instance of T as determined by resultSetHandler
-   * @throws Exception
-   *    if anything goes wrong
    */
-  public <T> T batchInsert(String sql, ResultSetHandler<T> resultSetHandler, List<List<Object>> batchParams) throws Exception {
+  public <T> T batchInsert(String sql, ResultSetHandler<T> resultSetHandler, List<List<Object>> batchParams) {
     return run(c -> {
       try (PreparedStatement stmt = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);) {
         for (List<Object> params : batchParams) {
@@ -280,20 +271,34 @@ public class QueryRunner {
    * 
    * @param txQueryRunner
    *    Make sure to use the {@link QueryRunner} passed to this lamba!
-   * @throws Exception
-   *    if anything goes wrong
    */
-  public void tx(BiConsumerWithException<QueryRunner, QueryRunner.Transaction> txQueryRunner) throws Exception {
-    Connection _connection = connection.get();
-    boolean originalAutoCommit = _connection.getAutoCommit();
-    _connection.setAutoCommit(false);
-    QueryRunner queryRunner = new QueryRunner(() -> _connection, c -> {});
+  public void tx(BiConsumerWithException<QueryRunner, QueryRunner.Transaction> txQueryRunner) {
+    Connection _connection = null;
+    Boolean originalAutoCommit = null;
     try {
+      _connection = connection.get();
+      Connection __connection = _connection;
+      originalAutoCommit = _connection.getAutoCommit();
+      _connection.setAutoCommit(false);
+      QueryRunner queryRunner = new QueryRunner(() -> __connection, c -> {});
       LOG.debug("Transaction: START");
-      txQueryRunner.accept(queryRunner, new QueryRunner.Transaction(_connection));
+      txQueryRunner.accept(queryRunner, new QueryRunner.Transaction(__connection));
+    } catch (Exception e) {
+      throw propagate(e);
     } finally {
-      finalizer.accept(_connection);
-      _connection.setAutoCommit(originalAutoCommit);
+      if (_connection != null) {
+        try {
+          finalizer.accept(_connection);
+        } catch (Exception e) {
+          LOG.error("Could not finalize connection", e);
+        }
+        
+      }
+      try {
+        _connection.setAutoCommit(originalAutoCommit);
+      } catch (SQLException e) {
+        LOG.error("Could not reset autocommit to original value", e);
+      }
       LOG.debug("Transaction: END");
     }
   }
@@ -327,17 +332,32 @@ public class QueryRunner {
       // of the actual column type. Oddly, NULL and
       // OTHER don't work with Oracle's drivers.
       int sqlType = Types.VARCHAR;
-      sqlType = statement.getParameterMetaData().getParameterType(jdbcIndex);
+      if (useParameterMetaData) {
+        try {
+          sqlType = statement.getParameterMetaData().getParameterType(jdbcIndex);
+        } catch (Exception e) {
+          useParameterMetaData = false;
+        }
+      }
       statement.setNull(jdbcIndex, sqlType);
     }
   }
   
-  private <T> T run(FunctionWithException<Connection, T> consumer) throws Exception {
-    Connection c = connection.get();
+  private <T> T run(FunctionWithException<Connection, T> consumer) {
+    Connection c = null;
     try {
+      c = connection.get();
       return consumer.apply(c);
+    } catch (Exception e) {
+      throw propagate(e);
     } finally {
-      finalizer.accept(c);
+      try {
+        if (c != null) {
+          finalizer.accept(c);
+        }
+      } catch (Exception e) {
+        LOG.error("Connection could not be closed", e);
+      }
     }
   }
 
@@ -351,5 +371,13 @@ public class QueryRunner {
         return Objects.toString(o);
       }).collect(Collectors.joining(", ", "[", "]")));
     }
+  }
+  
+  private static RuntimeException propagate(Exception e) {
+    if (e instanceof RuntimeException) {
+      return (RuntimeException) e;
+    }
+    
+    return new RuntimeException(e);
   }
 }
