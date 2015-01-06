@@ -64,6 +64,13 @@ public interface Converters {
         return targetClass.cast(value);
       }
       
+      if (converters.containsKey(targetClass)) {
+        @SuppressWarnings("unchecked")
+        Converter<T> converter = (Converter<T>) converters.get(targetClass);
+        
+        return converter.convert(targetClass, value);
+      }
+      
       Optional<Method> valueOfMethod = Arrays.stream(targetClass.getMethods())
         .filter(m -> Modifier.isStatic(m.getModifiers()))
         .filter(m -> m.getName().equals("valueOf"))
@@ -78,13 +85,7 @@ public interface Converters {
         }
       }
       
-      if (!converters.containsKey(targetClass)) {
-        throw new IllegalArgumentException("Cannot convert to " + targetClass.getName());
-      }
-      
-      @SuppressWarnings("unchecked")
-      Converter<T> converter = (Converter<T>) converters.get(targetClass);
-      return converter.convert(targetClass, value);
+      throw new IllegalArgumentException("Cannot convert to " + targetClass.getName() + " from " + value.getClass());
     }
     
     @Override
