@@ -23,7 +23,10 @@ import com.moandjiezana.uncommons.dbutils.functions.FunctionWithException;
 public class ObjectRowProcessor<T> implements RowProcessor<T> {
   
   /**
-   * @param metaDataMapper a mapper that returns the field or method corresponding to a given name
+   * @param metaDataMapper
+   *    a mapper that returns the field or method corresponding to a given name
+   * @param <T>
+   *    the type the returned {@link MetaDataMapper} accepts
    * @return a mapper that does not change the column name
    */
   public static <T> MetaDataMapper<T, Optional<AccessibleObject>> matching(MetaDataMapper<String, Optional<AccessibleObject>> metaDataMapper) {
@@ -36,6 +39,8 @@ public class ObjectRowProcessor<T> implements RowProcessor<T> {
 
   /**
    * @param metaDataMapper a mapper that returns the field or method corresponding to a given name
+   * @param <T>
+   *    the type the returned {@link MetaDataMapper} accepts
    * @return a mapper that converts names with underscores to camelCase
    */
   public static <T> MetaDataMapper<T, Optional<AccessibleObject>> underscoresToCamel(MetaDataMapper<String, Optional<AccessibleObject>> metaDataMapper) {

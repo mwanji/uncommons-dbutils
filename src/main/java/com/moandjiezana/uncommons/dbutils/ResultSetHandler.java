@@ -62,17 +62,6 @@ public interface ResultSetHandler<T> {
       return rowProcessor.handle(rs);
     };
   }
-  
-  /**
-   * @param resultSetHandler
-   *    processes the {@link ResultSet}
-   * @param <T>
-   *    the type of the instance wrapped in an {@link Optional}
-   * @return the result of invoking the underlying {@link ResultSetHandler}, wrapped in an {@link Optional}.
-   */
-  static <T> ResultSetHandler<Optional<T>> optional(ResultSetHandler<T> resultSetHandler) {
-    return rs -> Optional.ofNullable(resultSetHandler.handle(rs));
-  }
 
   /**
    * 
@@ -110,7 +99,18 @@ public interface ResultSetHandler<T> {
    * @see MapResultSetHandler
    */
   static <K, V> ResultSetHandler<Map<K, V>> map(String keyColumn, Class<K> keyClass, RowProcessor<V> rowProcessor) {
-    return new MapResultSetHandler<>(column(keyColumn, keyClass), rowProcessor);
+    return new MapResultSetHandler<>(column(keyColumn, keyClass), rowProcessor, null);
+  }
+  
+  /**
+   * @param resultSetHandler
+   *    processes the {@link ResultSet}
+   * @param <T>
+   *    the type of the instance wrapped in an {@link Optional}
+   * @return the result of invoking the underlying {@link ResultSetHandler}, wrapped in an {@link Optional}.
+   */
+  static <T> ResultSetHandler<Optional<T>> optional(ResultSetHandler<T> resultSetHandler) {
+    return rs -> Optional.ofNullable(resultSetHandler.handle(rs));
   }
 
   /**
