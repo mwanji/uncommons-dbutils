@@ -32,23 +32,39 @@ public interface RowProcessor<T> {
   T handle(ResultSet resultSet) throws Exception;
   
   /**
-   * @param withRowProcessor
+   * @param subRowProcessor
+   *    the RowProcessor to also run on this row
    * @param combiner
-   * @return a new RowProcessor instance that returns the result of this {@link #handle(ResultSet)}, after 
+   *    specifies how to combine the results of each RowProcessor
+   * @param <U>
+   *    the type subRowProcessor maps to
+   * @return a new RowProcessor instance that returns the result of this {@link #handle(ResultSet)}, after having combined it with the result of
+   *    withRowProcessor
    */
-  default <U> RowProcessor<T> with(RowProcessor<U> withRowProcessor, BiConsumerWithException<T, U> combiner) {
+  default <U> RowProcessor<T> with(RowProcessor<U> subRowProcessor, BiConsumerWithException<T, U> combiner) {
     return (rs) -> {
       T result = handle(rs);
       
-      combiner.accept(result, withRowProcessor.handle(rs));
+      combiner.accept(result, subRowProcessor.handle(rs));
       
       return result;
     };
+  }
+
+  /**
+   * @param table
+   *    the table to take columns from
+   * @return a new RowProcessor instance that restricts the {@link ResultSet} to the given table
+   */
+  default RowProcessor<T> fromTable(String table) {
+    return rs -> handle(new ResultSetView(rs, table));
   }
   
   /**
    * @param supplier
    *    creates the per-row container
+   * @param <T>
+   *    the type supplier provides
    * @return a RowProcessor that is useful for chaining {@link #with(RowProcessor, BiConsumerWithException)}.
    */
   static <T> RowProcessor<T> container(Supplier<T> supplier) {
