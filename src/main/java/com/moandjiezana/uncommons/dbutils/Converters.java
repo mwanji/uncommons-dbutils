@@ -1,9 +1,15 @@
 package com.moandjiezana.uncommons.dbutils;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.sql.Clob;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Arrays;
@@ -52,6 +58,13 @@ public interface Converters {
     
     {
       register(Instant.class, (cl, value) -> ((Timestamp) value).toInstant());
+      register(String.class, (cl, value) -> {
+        if (value instanceof Clob) {
+          return convertClob(value);
+        }
+        
+        return value.toString();
+      });
     }
 
     @Override
@@ -92,5 +105,22 @@ public interface Converters {
     public <T> void register(Class<T> targetClass, Converter<T> converter) {
       converters.put(targetClass, converter);
     }
+
+    private String convertClob(Object value) {
+      try {
+        Reader input = ((Clob) value).getCharacterStream();
+        Writer output = new StringWriter();
+        char[] buffer = new char[4096];
+        int n = 0;
+        while (-1 != (n = input.read(buffer))) {
+          output.write(buffer, 0, n);
+        }
+        
+        return output.toString();
+      } catch (IOException | SQLException e) {
+        throw new RuntimeException(e);
+      }
+    }
   };
 }
+
