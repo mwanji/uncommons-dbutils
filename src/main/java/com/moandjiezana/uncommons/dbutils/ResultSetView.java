@@ -532,7 +532,7 @@ class ResultSetView implements ResultSet {
 
   @Override
   public void updateNull(int columnIndex) throws SQLException {
-    rs.updateNull(columnIndex);
+    rs.updateNull(mapping[columnIndex]);
   }
 
   @Override
@@ -1037,7 +1037,7 @@ class ResultSetView implements ResultSet {
 
   @Override
   public void updateBlob(String columnLabel, InputStream inputStream, long length) throws SQLException {
-    rs.updateBlob(columnLabel, inputStream, length);
+    rs.updateBlob(findColumn(columnLabel), inputStream, length);
   }
 
   @Override
