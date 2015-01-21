@@ -52,7 +52,7 @@
         <artifactId>jacoco-maven-plugin</artifactId>
         <version>0.7.2.201409121644</version>
         <configuration>
-          <!--outputDirectory>${project.reporting.outputDirectory}/${project.version}/jacoco</outputDirectory-->
+          <outputDirectory>${project.reporting.outputDirectory}/${project.version}/jacoco</outputDirectory>
         </configuration>
         <executions>
           <execution>
@@ -77,9 +77,9 @@
         <artifactId>coveralls-maven-plugin</artifactId>
         <version>3.0.1</version>
         <configuration>
-          <!--jacocoReports>
-            <param>${project.reporting.outputDirectory}/${project.version}/jacoco</param>
-          </jacocoReports-->
+          <jacocoReports>
+            <param>${project.reporting.outputDirectory}/${project.version}/jacoco/jacoco.xml</param>
+          </jacocoReports>
         </configuration>
       </plugin>
     </plugins>
